@@ -1,20 +1,21 @@
 # --- Copyrighted game material — NEVER commit ---
-# Client/server binaries, assets, and original master data live outside the tree.
+# Binaries/assets live OUTSIDE the tree; these are the in-repo staging dirs.
+# NOTE: no blanket *.dll/*.exe/*.lto globs on purpose — the RE work product under
+# disassembly/symbols/ lives in directories NAMED after modules (e.g.
+# symbols/<module>.dll/…), and such globs would silently ignore that data.
 /client/
 /binaries/
-*.exe
-*.dll
-*.lto
-*.pak
-*.dat
 
 # --- Host-specific RE config (paths differ per machine) ---
 tools/re/ghidra.local.json
 
-# --- Ghidra project locks / scratch (commit the exported JSON, not the .rep) ---
+# --- Ghidra project + scratch (commit the exported JSON, never the project) ---
+*.gpr
 *.rep/
+*.gzf
 *.lock
 *.lock~
+local.just
 
 # --- Python ---
 __pycache__/

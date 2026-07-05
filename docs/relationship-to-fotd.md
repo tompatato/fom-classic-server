@@ -51,21 +51,35 @@ There are also repo-scoped Claude **skills** in the FotD project (`fom-network`,
 **FotD-specific** (RakNet 3.611) knowledge — useful background, but do not treat
 their contents as true for the 2006 protocol.
 
-## Porting the `fomre` harness
+## The `fomre` harness (ported)
 
-The harness is a good early port because its core is binary-agnostic:
+The harness has been ported into this repo at [`tools/re/`](../tools/re/) — the
+**code only**. None of FotD's reverse-engineered data (`symbols/`, `types/`) came
+with it; `disassembly/` is empty until recon catalogues the 2006 client. Its core
+is binary-agnostic:
 
-- `symdb.py` — indexes the exported symbol/type JSON. Generic; only the *data*
-  (module names, addresses) is FotD-specific.
+- `symdb.py` — indexes the exported symbol/type JSON. Generic; only the *data* is
+  client-specific.
 - `memory.py` — finds the PID, recovers module load bases, reads/scans
-  `/proc/<pid>/mem`. Fully generic.
+  `/proc/<pid>/mem`. Generic.
 - `ghidra.py` — headless-Ghidra decompile/xref bridge. Generic given a built
   project and `ghidra.local.json`.
 - `fomre.py` — the CLI tying them together.
 
-To port: copy `tools/re/` into this repo, then rebuild the `disassembly/` export
-from the **2006** client (new module names, new symbols) rather than reusing
-FotD's. The `ghidra.local.json` paths (`docs/toolchain.md`) carry over unchanged.
-The harness's `just` recipes (`re-test`, `ghidra-gen`, `ghidra-dump`) come with it
-into a root `justfile`; `just` is assumed installed (see `docs/toolchain.md`).
-Recommended once recon Steps 0–1 give us module names and a first Ghidra project.
+What changed in the port (clean-room / renamed away from FotD):
+
+- **Ghidra project** `FOTD` → `FoMClassic` (so `disassembly/FoMClassic.gpr`).
+- **Env vars** `FOTD_*` → `FOMC_*`: `FOMC_DISASM_DIR`, `FOMC_GHIDRA_JDK`,
+  `FOMC_RE_ALLOW_WRITE`, `FOMC_GAME_DIR`.
+- **Client modules** are no longer hardcoded (FotD baked in `CShell.dll` /
+  `Object.lto` / `fom_client.exe`). The 2006 set is unknown until recon, so it is
+  declared once via **`FOMC_CLIENT_MODULES`** (comma-separated) — consumed by both
+  process detection (`memory.py`) and `just ghidra-gen`'s import loop — or derived
+  from whatever is catalogued in `disassembly/symbols/`.
+- **Tests** run against a synthetic fixture instead of FotD's committed data, so
+  `just re-test` is green with no game data (17 tests).
+
+The tool name `fomre` and the `@@FOMRE@@` sentinel are unchanged — both apply to
+Face of Mankind regardless of release. Next step: rebuild the `disassembly/` export
+from the 2006 client once recon Steps 0–1 give us module names and a first Ghidra
+project. The `ghidra.local.json` paths (`docs/toolchain.md`) carry over unchanged.

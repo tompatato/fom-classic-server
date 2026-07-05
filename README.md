@@ -25,6 +25,9 @@ Then:
   toolchain lives and the gotchas that will otherwise eat an afternoon.
 - [`docs/relationship-to-fotd.md`](docs/relationship-to-fotd.md) — what carries
   over from the sibling FotD emulator, what resets, and where the prior art lives.
+- [`tools/re/`](tools/re/) — the `fomre` reverse-engineering harness (static
+  symbol/type DB + live memory + headless Ghidra). Ported and working; `just
+  re-test` is green. Data lands here once recon starts.
 - [`knowledge-base/client/`](knowledge-base/client/) — the Obsidian vault where RE
   deep dives get written up.
 
