@@ -6,6 +6,20 @@ variables or a gitignored local config. What matters is the **version
 constraints** below; the host defaults on a modern distro are often too new and
 fail in non-obvious ways.
 
+## Task runner (`just`)
+
+Build, RE, and dev workflows are driven by [`just`](https://just.systems) recipes,
+following the same convention as the FotD project. **`just` is assumed to be on
+your `PATH`** — install it once:
+
+- Fedora: `sudo dnf install just`
+- Or `cargo install just`, or a prebuilt binary into `~/.local/bin`.
+
+No `justfile` exists yet — Phase 0 is recon and needs neither a build nor the
+recipe set. Once the RE harness is ported and servers are scaffolded, their recipes
+live in a root `justfile` and are invoked as `just <recipe>` (e.g. `just re-test`,
+`just ghidra-gen`).
+
 ## Version constraints
 
 | Tool | Required version | Why the newest isn't fine |
@@ -45,10 +59,13 @@ On `EACCES`/`EPERM`: `sudo sysctl kernel.yama.ptrace_scope=0`.
 ## SELinux + Docker (relevant once servers exist)
 
 On SELinux-enforcing distros (e.g. Fedora), SELinux blocks Docker build
-bind-mounts (`--mount type=bind` → `Permission denied`). If this project later uses
-Docker builds like FotD did, add `--security-opt label=disable` to each
-`docker run`, or use `,relabel=shared` on the mounts. Named volumes are unaffected.
-Not relevant during Phase 0 recon, which needs neither Docker nor a native build.
+bind-mounts (`--mount type=bind` → `Permission denied`), which breaks any `just`
+recipe that mounts the source tree into a build container. When this project adds
+Docker build recipes, bake the SELinux-safe mount **into the `justfile` itself** —
+`,relabel=shared` on the bind mount (or `--security-opt label=disable` on the
+`docker run`) — so `just <recipe>` works on enforcing hosts without a separate
+wrapper script. Named volumes are unaffected. Not relevant during Phase 0 recon,
+which needs neither Docker nor a native build.
 
 ## Client runtime
 

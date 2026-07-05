@@ -66,4 +66,6 @@ The harness is a good early port because its core is binary-agnostic:
 To port: copy `tools/re/` into this repo, then rebuild the `disassembly/` export
 from the **2006** client (new module names, new symbols) rather than reusing
 FotD's. The `ghidra.local.json` paths (`docs/toolchain.md`) carry over unchanged.
+The harness's `just` recipes (`re-test`, `ghidra-gen`, `ghidra-dump`) come with it
+into a root `justfile`; `just` is assumed installed (see `docs/toolchain.md`).
 Recommended once recon Steps 0–1 give us module names and a first Ghidra project.
