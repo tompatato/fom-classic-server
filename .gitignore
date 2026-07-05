@@ -1,0 +1,35 @@
+# --- Copyrighted game material — NEVER commit ---
+# Client/server binaries, assets, and original master data live outside the tree.
+/client/
+/binaries/
+*.exe
+*.dll
+*.lto
+*.pak
+*.dat
+
+# --- Host-specific RE config (paths differ per machine) ---
+tools/re/ghidra.local.json
+
+# --- Ghidra project locks / scratch (commit the exported JSON, not the .rep) ---
+*.rep/
+*.lock
+*.lock~
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+
+# --- Build output (once servers exist) ---
+out/
+build/
+
+# --- Obsidian per-user workspace state (keep the notes, drop the UI state) ---
+knowledge-base/**/.obsidian/workspace*
+knowledge-base/**/.obsidian/cache
+
+# --- Editor / OS ---
+.idea/
+.vscode/
+.DS_Store
