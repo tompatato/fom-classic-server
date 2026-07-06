@@ -45,25 +45,28 @@ main modules identified.
 whether FotD's `FOMNetwork` (RakNet 3.611) is a *fork candidate* or *reference
 only*.
 
-This determines whether the wire layer is a fork or a rewrite. RakNet has existed
-since ~2004; the 2006 client could use **RakNet 2.x, an early RakNet 3.x, or
-something else entirely**. The BitStream format, `MessageIdentifiers` enum base,
-compression, and connection handshake all shift across RakNet major/minor versions.
+> ✅ **RESOLVED (2026-07-06): it is NOT RakNet.** The client speaks a **custom
+> protocol over raw Winsock** — a length-prefixed **TCP** main channel
+> (`[opcode:u16 BE][len:u16 BE][body]`) plus a **UDP** movement channel, port
+> `7500 + WorldId`. So FotD's RakNet `FOMNetwork` is **reference only → rewrite**
+> (settles the Step 4 network decision too). Full write-up:
+> `knowledge-base/client/Network Library.md`; framing/opcodes implemented and
+> byte-tested in the `FOM.Protocol` C# library (`dotnet test FOM.slnx`).
 
 Techniques (cheapest first):
 
-- [ ] **String scan** the binaries for `RakNet`, version strings, `RakPeer`,
-      `BitStream`, `ID_CONNECTION_REQUEST`, and copyright banners. RakNet embeds
-      recognizable strings.
-- [ ] **Import table** inspection — is networking in a separate DLL or static?
-- [ ] **Ghidra signature match**: pull the RakNet 3.611 sources (vendored in the
-      sibling `fotd-server` checkout at `extern/raknet`) and compare
-      function shapes / constants (e.g. the `MessageIdentifiers` enum ordering,
-      offline-message IDs) against the 2006 binary.
-- [ ] If RakNet: pin the **exact version** and locate matching upstream source for
-      that version. If not RakNet: identify what it is before proceeding.
+- [x] **String scan** the binaries for `RakNet`, version strings, `RakPeer`,
+      `BitStream`, `ID_CONNECTION_REQUEST`, and copyright banners.
+      → **0 RakNet hits** in any module.
+- [x] **Import table** inspection — is networking in a separate DLL or static?
+      → imports **`WSOCK32.dll`** (Winsock 1.1); `Lithtech.exe` has
+      `udp_BuildSockaddrFromString` (engine's own UDP helper).
+- [ ] **Ghidra signature match** — no longer needed for library ID; reserve for
+      decoding individual opcode bodies against the client.
+- [x] If RakNet: pin the version … / If not RakNet: identify what it is.
+      → Custom Winsock TCP+UDP; see the note.
 
-Record findings in `knowledge-base/client/` (e.g. a `Network Library.md` note).
+Findings recorded in `knowledge-base/client/Network Library.md`.
 
 ---
 

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FOM.Protocol/FOM.Protocol.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FOM.Protocol.Tests/FOM.Protocol.Tests.csproj" />
+  </Folder>
+</Solution>
