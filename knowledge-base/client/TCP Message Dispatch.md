@@ -9,6 +9,12 @@ Handlers are grouped by the subsystem object they run on. Complements
 > Status: ✅ verified — decompiled from `FUN_10079840` (Ghidra). Handler *names*
 > are addresses (unlabeled); subsystem grouping is by the global they dispatch on.
 
+> **This is only the CShell half.** `Object.lto` (the LithTech local server) has a
+> *second, disjoint* TCP router — ServerShell `OnMessage` (`FUN_100371d0`) — that
+> owns the world range `0x3EA`–`0x3FF`, `0x7D2`, and `0x7D7`–`0x831`, and is where
+> the actual avatar spawn lives. See [[World Object Spawn]]. This CShell router
+> (`0x7DE`–`0x83D`) handles UI/roster/economy only.
+
 ## Subsystems
 
 - **`DAT_1010ced8`** — player/roster manager. Owns `0x82d` (full roster → a
