@@ -7,6 +7,13 @@ reference stub, and the server can inject it after world entry — but whether t
 client renders a **3D avatar** (vs. only a UI roster row) is **not yet confirmed**.
 Related: [[Session Opcodes]], [[Network Library]].
 
+> ✅ **RESOLVED (2026-07-06): `0x082D` is the wrong layer entirely.** The real
+> 3D-avatar spawn lives in **`Object.lto`** (the LithTech local server), not
+> `CShell.dll` — see [[World Object Spawn]]. Every avatar is a `CCharacter` the
+> engine replicates from the in-process server; `0x082D` and the whole
+> `ced8`/`ced4` CShell path is UI/economy data only. The "next targets" below
+> (ced4, per-player CShell opcodes) are **superseded** — kept for history.
+
 > Status: 🔴 **`0x082D` is not the 3D-avatar spawn (2026-07-06).** Three live
 > variants — empty roster, `count=1` populated roster, and roster + mirrored UDP
 > movement for the entity — all rendered nothing, with the server verified to send
