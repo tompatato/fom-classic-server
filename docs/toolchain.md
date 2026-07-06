@@ -69,6 +69,15 @@ which needs neither Docker nor a native build.
 
 ## Client runtime
 
+> **Update (recon Step 3, done):** the client *does* run well via a Steam
+> non-Steam shortcut under **Proton Experimental**, and that is the recommended
+> path — Proton's pressure-vessel container forwards host PipeWire, which a fresh
+> Fedora `wine-staging` prefix does not (its missing audio backend triggers an
+> engine-side sound-init crash). The full, verified procedure — patch prereqs,
+> `d3dx9_26.dll` extraction, args, and a headless CLI variant — is in
+> [`running-the-client.md`](running-the-client.md). The note below on a plain Wine
+> prefix is kept for context but is the harder path.
+
 The 2006 client predates Steam, so the FotD Steam-Proton shortcut approach likely
 doesn't apply — expect a plain Wine prefix. Watch for a **keyboard/OEM-key gotcha**
 seen with the FotD client: under KDE Wayland, XWayland can present layout `us` while

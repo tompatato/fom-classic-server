@@ -101,8 +101,13 @@ with a first `knowledge-base/client/Login Handshake.md` note.
 **Exit criteria:** the 2006 client runs reliably under Wine/Proton, and we can read
 its live process memory.
 
-- [ ] Get it launching (Wine prefix or Steam-Proton shim). The FotD keyboard/OEM
+- [x] Get it launching (Wine prefix or Steam-Proton shim). The FotD keyboard/OEM
       gotcha (XWayland `us` vs UK `gb` layout) may recur — see `docs/toolchain.md`.
+      → **Launches under Proton Experimental** (Steam non-Steam shortcut) driving
+      `Lithtech.exe` directly; renders to the login screen. Raw Fedora Wine fails
+      (no audio backend → sound-init null-deref). Full method:
+      `docs/running-the-client.md`; RE detail: `knowledge-base/client/Launcher
+      Bootstrap.md`. This also satisfies Step 0's "launchable" exit criterion.
 - [ ] Confirm live memory access works: `kernel.yama.ptrace_scope = 0` and
       same-UID. This unlocks the `read`/`scan`/`struct` live-inspection half of the
       RE harness.

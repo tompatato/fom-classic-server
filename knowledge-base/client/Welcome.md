@@ -23,6 +23,8 @@ _Phase 0 recon in progress._
 
 - [[Network Address Table]] — the client's hardcoded server-address table in
   `CShell.dll` and the localhost redirect (recon Step 2). ✅
+- [[Launcher Bootstrap]] — how `FOM.exe` version-checks and spawns the engine, the
+  direct-launch bypass, and the sound-init crash (recon Steps 0/3). ✅
 - `Network Library` — which net lib + version the client uses (recon Step 1). ⭐
 - `Login Handshake` — connect + login wire format (recon Step 2).
 - `Client Architecture` — module/engine split.
