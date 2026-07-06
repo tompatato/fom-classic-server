@@ -23,9 +23,9 @@ public class ScenarioTests
 
         await client.SendLoadCharAsync(ct);
         byte[] enter = await client.ExpectAsync(PacketId.ENTER_WORLD, ct);
-        // status(4) | world(StsGenesis=21) | node(1) | pad
+        // status(4) | world(the one the client connected on) | node(1) | pad
         Assert.Equal(4u, BinaryPrimitives.ReadUInt32BigEndian(enter));
-        Assert.Equal((uint)WorldId.StsGenesis, BinaryPrimitives.ReadUInt32BigEndian(enter.AsSpan(4)));
+        Assert.Equal((uint)WorldPort.FromPort(server.Port), BinaryPrimitives.ReadUInt32BigEndian(enter.AsSpan(4)));
     }
 
     [Fact]
