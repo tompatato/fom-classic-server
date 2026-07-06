@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FOM.Server\FOM.Server.csproj" />
+    <ProjectReference Include="..\..\src\FOM.TestClient\FOM.TestClient.csproj" />
   </ItemGroup>
 
 </Project>
