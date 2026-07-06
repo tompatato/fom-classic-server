@@ -19,6 +19,21 @@ Related: [[Session Opcodes]], [[Network Library]].
 > `ENTER_WORLD` for the world the client actually connected on (was hardcoded
 > StsGenesis), so the client loads the correct map.
 
+## Where the real spawn likely is (next targets)
+
+`0x082D`'s consumer (`FUN_10074590` on the roster manager `DAT_1010ced8`) just
+caches each entry in a 1000-slot table (`FUN_100741c0`, keyed by id) — pure data,
+no model creation. So the 3D character spawn is elsewhere. From the
+[[TCP Message Dispatch]] map, the candidates to decompile next:
+
+- **Per-player opcodes on `DAT_1010ced8`**: `0x82f` (`FUN_10074700`, right after the
+  roster — likely "add one player"), `0x817`, `0x819`, `0x825`, `0x826`, `0x837`,
+  `0x83a`. One should be "player entered → create model".
+- **The `DAT_1010ced4` subsystem** (`0x7ee`–`0x80d`) — a distinct object/world
+  manager; strong candidate for engine-level character/object creation.
+
+Look for the handler that calls a LithTech object/model-create with a position.
+
 ## Deserializer (entry format + root cause)
 
 The `0x082D` data class (slots 0–2 of vtable `PTR_FUN_100fa8fc`) confirms the
