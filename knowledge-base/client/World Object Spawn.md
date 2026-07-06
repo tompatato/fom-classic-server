@@ -143,25 +143,63 @@ Logs *"Level login caching done, took %.1f seconds"*. So ENTER_WORLD warms the
 model cache for who's about to appear; the entities themselves arrive separately
 and are spawned by `FUN_10036fc0`.
 
+## Engine-side transport investigation (Lithtech.exe + server.dll)
+
+Both binaries are now imported into the `FoMClassic` project. Findings on how the
+shell methods get invoked:
+
+- **Shell vtable identity confirmed.** The engine holds the shell interface at
+  **`Lithtech.exe!DAT_0058aee4`**; it calls `*shell + 0x20` = method 8 =
+  `OnClientEnterWorld` (the "…returned LTNULL!" error site, `FUN_00461b30`),
+  matching Object.lto table[8]. So table `0x10087030` **is** the IServerShell
+  vtable and `FUN_10036fc0` **is** method 19 (offset `0x4c`).
+- The engine's `DAT_0058aee4` only calls methods **4, 5, 8, 9** (offsets
+  `0x10/0x14/0x20/0x24`). Reliable messages reach the shell via **server.dll's
+  `ServerInterface` vtable** (`0x10057cb0`…): `FUN_1002b301` forwards
+  `OnObjectMessage` (shell m17, a no-op stub) and **`FUN_1002b31a` forwards
+  `OnMessage` (shell m18 = `FUN_100371d0`, the TCP opcode router)**. There is **no
+  ServerInterface forwarder for m19**, and no `+0x4c` shell call in server.dll.
+- ⇒ **Method 19 is invoked directly by the engine on a threaded/indexed dispatch
+  path** (not the reliable `OnMessage` route). Object.lto's IServerShell m17 (the
+  standard object-message hook) is stubbed out, so FoM repurposed **m19 as its own
+  state channel**. Given m18 = reliable TCP and m19 is the raw (non-deserialized)
+  entity snapshot, m19 is almost certainly the **unreliable / UDP world-state
+  channel** — consistent with movement `0x03F3` being UDP and ignored by m18.
+- The engine UDP receive is **`Lithtech.exe!FUN_0047dab0`** (`recvfrom` via
+  `Ordinal_17`, logs "UDP: recvfrom…"); it ref-counts the datagram into a queue
+  (`FUN_0042b720`) consumed asynchronously — which is why the datagram→m19 path
+  doesn't decompile as a straight call chain.
+
 ## What to try next
 
-1. Find the transport that delivers the 32-byte-entry snapshot to method 19
-   (`FUN_10036fc0`) — likely a specific message (possibly on UDP, like movement
-   `0x03F3`, which OnMessage explicitly ignores) or an engine object-replication
-   path. Grep `Object.lto` for a producer that writes count@+0x14 / 0x20-byte
-   entries@+0x18.
+1. **Decisive: dynamic analysis.** Break on `Object.lto!FUN_10036fc0` (and
+   `FUN_10035930`) in the live client, then read `param_1` (the snapshot buffer:
+   count@+0x14, 32-byte entries@+0x18) and walk the call stack up into the engine
+   to see which socket/channel produced it. That pins the exact transport + wire
+   layout in one shot, versus chasing the threaded dispatch statically.
 2. Cross-check the C# server: the **local** player already spawns as a `CCharacter`
    via this machinery, so our server already emits whatever seeds the entity table.
-   Find that path and add a second entry (id + packed pos + appearance) to make a
-   second avatar appear. This is the live experiment.
+   Confirm whether the local avatar is even rendered (third-person body) — if so,
+   m19 already fires with our current messages and only a second entry is missing.
+3. Once the channel is known, emit a snapshot entry from `GameHost` (TCP or the
+   existing UDP `SendToAsync`) with id + packed position + appearance and observe.
 
 ## Reproduce
 
+`Object.lto`, `server.dll`, and `Lithtech.exe` are all imported into the
+`FoMClassic` Ghidra project. Re-derive (use `-process <module>`):
+
 ```bash
-# Object.lto is imported into the FoMClassic Ghidra project. Re-derive:
+# Object.lto:
 #   ServerShell vtable:      dump_ptrs.py 0x10087030 20
 #   OnMessage opcode table:  dump_ptrs.py 0x100373f0 22   (base opcode 0x3EA)
 #   spawn:                   decompile.py 0x10035930   (CreateObject "CCharacter")
 #   appearance:              decompile.py 0x10008080 ; 0x1002da30
 #   snapshot walker:         decompile.py 0x10036fc0
+# server.dll:
+#   OnMessage forwarder:     decompile.py 0x1002b31a ; ServerInterface vtable 0x10057cb0
+# Lithtech.exe:
+#   engine shell ptr:        xref.py 0x0058aee4 to
+#   UDP receive:             decompile.py 0x0047dab0
+# helpers added this pass: find_vcalls.py <disp…>, find_indexed_calls.py
 ```
