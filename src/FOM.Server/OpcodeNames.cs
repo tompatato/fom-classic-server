@@ -14,6 +14,7 @@ public static class OpcodeNames
         [(ushort)PacketId.ENTER_WORLD] = "ENTER_WORLD",
         [(ushort)PacketId.EXIT_APT] = "EXIT_APT",
         [(ushort)PacketId.ZONE_UPDATE] = "ZONE_UPDATE",
+        [(ushort)PacketId.SPAWN_MEETINGPOINT] = "SPAWN_MEETINGPOINT",
         [(ushort)PacketId.CHAT] = "CHAT",
         [(ushort)PacketId.MOVEMENT] = "MOVEMENT",
         [(ushort)PacketId.POLL] = "POLL",

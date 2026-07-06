@@ -22,6 +22,7 @@ RVA_WALKER = 0x36fc0   # FUN_10036fc0  snapshot walker (spawns new chars)
 RVA_SPAWN  = 0x35930   # FUN_10035930  CreateObject CCharacter
 RVA_ENTER  = 0x3df00   # FUN_1003df00  ENTER_WORLD (0x3EB) handler — world-entry probe
 RVA_APPEAR = 0x8080    # FUN_10008080  SetAppearance(this, code) — common chokepoint
+RVA_MEETING = 0x34740  # FUN_10034740  0x3FE CMeetingPoint spawn handler (server-driven test)
 MODULE_NEEDLE = "object.lto"
 
 
@@ -159,6 +160,23 @@ class _Appear(gdb.Breakpoint):
         return False
 
 
+class _Meeting(gdb.Breakpoint):
+    def stop(self):
+        sp = int(gdb.parse_and_eval("$sp"))
+        ret = _u32(sp)
+        msg = _u32(sp + 4)  # incoming message object
+        print("\n=== FUN_10034740 (0x3FE CMeetingPoint spawn) — server-driven! ===")
+        print("  called from: %s" % _module_of(ret))
+        # buffer ptr is at msg+0xc; payload fields land at buffer+? — dump some bytes
+        try:
+            buf = _u32(msg + 0xc)
+            raw = b"".join(bytes([_u32(buf + i) & 0xff]) for i in range(0, 24))
+            print("  msg=0x%x buf=0x%x first24=%s" % (msg, buf, raw.hex()))
+        except gdb.error:
+            pass
+        return False
+
+
 class FomHook(gdb.Command):
     def __init__(self):
         super().__init__("fom-hook", gdb.COMMAND_USER)
@@ -183,8 +201,10 @@ class FomHook(gdb.Command):
         _Spawn("*0x%x" % (base + RVA_SPAWN))
         _Enter("*0x%x" % (base + RVA_ENTER))
         _Appear("*0x%x" % (base + RVA_APPEAR))
-        print("armed: walker@0x%x spawn@0x%x enter@0x%x appear@0x%x — continuing"
-              % (base + RVA_WALKER, base + RVA_SPAWN, base + RVA_ENTER, base + RVA_APPEAR))
+        _Meeting("*0x%x" % (base + RVA_MEETING))
+        print("armed: walker@0x%x spawn@0x%x enter@0x%x appear@0x%x meeting@0x%x — continuing"
+              % (base + RVA_WALKER, base + RVA_SPAWN, base + RVA_ENTER, base + RVA_APPEAR,
+                 base + RVA_MEETING))
         gdb.execute("continue")
 
 
