@@ -40,6 +40,22 @@ Resolution order (mirrors the FotD `fomre` harness):
   default `python3` is unsupported, create that venv from a 3.10–3.13 interpreter
   and the launcher reuses it.
 
+### Setup reality on a current Fedora (verified working)
+
+The host defaults are too new (Java 25, Python 3.14), and Fedora's repos may not
+carry a 21–24 JDK. What worked:
+
+- **JDK 21**: not in dnf → use an Adoptium **Temurin 21** tarball (no root); point
+  `ghidra.local.json` `jdk` at it.
+- **Python 3.13**: `sudo dnf install python3.13` (available), used only for PyGhidra.
+- **Ghidra 12.0.4** + Temurin 21 extracted into a user dir (outside the repo).
+- **`just ghidra-gen` hardcodes `python3`** (which is 3.14 here) — run it with a
+  `python3 → python3.13` symlink first on `PATH` so PyGhidra bootstraps on 3.13,
+  and set `GHIDRA_INSTALL_DIR` + `JAVA_HOME`.
+
+Handy: `disassembly/scripts/decompile.py` (function → C JSON) and `dump_vtable.py`
+(vtable → decompiled methods) drive headless decompilation.
+
 `tools/re/ghidra.local.json` is per-machine and **gitignored** — never commit
 absolute install paths. Shape:
 

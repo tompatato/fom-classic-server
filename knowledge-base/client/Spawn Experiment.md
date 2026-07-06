@@ -7,10 +7,45 @@ reference stub, and the server can inject it after world entry — but whether t
 client renders a **3D avatar** (vs. only a UI roster row) is **not yet confirmed**.
 Related: [[Session Opcodes]], [[Network Library]].
 
-> Status: ❌ **Disproven as a standalone spawn (2026-07-06).** Sending a single-entry
-> `0x082D` to the live client produced **no visible effect** — no 3D avatar and no
-> UI roster entry (see Result). So `0x082D`-with-one-entry is not the avatar-spawn,
-> or is insufficient on its own. Matches the reference stub's disabling of it.
+> Status: 🟡 **Right opcode, wrong payload (2026-07-06).** Live injection rendered
+> nothing (see Result), but Ghidra shows `0x082D` *is* a real, handled message —
+> our injected body was simply mis-laid-out, so the client's deserializer produced
+> nothing. The fix is the correct struct layout, not a different opcode. See
+> "Ghidra findings".
+
+## Ghidra findings (handler located)
+
+`CShell.dll` has a **dedicated message class for `0x082D`** (ctor `FUN_100a5970`,
+vtable `PTR_FUN_100fa8fc`, methods at `100a5a00/5930/5a20/5be0/5cc0`). Its base
+initializer `FUN_100a3c60(this, 0x82d, 0x17f4, 0x17f4, buf)` records:
+
+| Field | Off | Value | Meaning |
+| --- | --- | --- | --- |
+| vtable | `+0` | `PTR_LAB_100fa808` | base message-class vtable |
+| type | `+4` | `0x48` | message category |
+| msgId | `+6` | `0x082D` | opcode |
+| capacity | `+8` | `0x17F4` (6132) | **max** buffer size (not fixed) |
+| cur size | `+10` | computed | serialized length, e.g. `count*0x50 + base` |
+| buffer | `+0xc` | ptr | payload storage |
+
+The serialization/size methods reveal the payload is **arrays of `0x50` (80)-byte
+object entries** guarded by a **30-bit count** (`count & 0x3FFFFFFF`) plus a
+trailing NUL-terminated string — but at **different offsets** than the reference
+stub guessed (stub put count at `+0x50`, objects at `+0x54`; the real class keys
+off a count field and 80-byte slots elsewhere). So the stub's `0x082D` body was
+structurally wrong; the client accepted it (subscribed opcode) and deserialized
+garbage → no entity.
+
+**Conclusion:** `0x082D` is the correct handler; our packet layout is wrong.
+
+## What to try next
+
+1. **Decompile the deserializer** — the base vtable `PTR_LAB_100fa808` "read from
+   message" method (and the derived read at `100a5a20`) give the exact field order
+   read off the wire. Derive the real layout, rebuild `SpawnZoneUpdate` to match
+   (≤ 6132 bytes), and re-test live.
+2. Populate a real object/entity entry (80-byte slot) with a valid appearance +
+   position rather than zeros, and set the count field.
 
 ## Result (2026-07-06)
 
@@ -53,20 +88,6 @@ FOM_SPAWN_TEST=1 FOM_CAPTURE=spawn.jsonl just serve
 Then **observe the client**: does a CLONE avatar appear in the world? A row in a
 player/roster UI? Nothing? Record the outcome here.
 
-## What to try next (given "nothing rendered")
-
-Cheapest → most rigorous:
-
-1. **Spawn + movement together** — inject `0x082D`, *then* send `0x03F3` movement
-   for the same entity id back to the client's UDP source (the stub prototyped both
-   halves separately, never together). Quick code change; may be what "instantiates"
-   the entity.
-2. **Static RE (Ghidra)** — decompile the client's `0x082D` handler in
-   `CShell.dll`/`Object.lto` to see exactly which fields it reads and what path
-   actually creates a world entity/avatar. Definitive; this is what `disassembly/`
-   exists for. Likely reveals the real spawn opcode/struct.
-3. **Live memory** — watch the client's entity list while injecting variants
-   (`fomre` read/scan) to see if anything lands.
 
 ## Reproduce
 
