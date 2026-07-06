@@ -62,16 +62,19 @@ def build_chat(sender_id, channel, name, msg):
     return frame(0x03EA, b)
 
 
-def build_spawn(entity_id, name, appearance):
+def build_spawn(entity_id, name, appearance, count=1):
+    def entry(p):
+        put_u32(p, entity_id)
+        put_u32(p, appearance)
+        for _ in range(5):
+            put_u32(p, 0)          # 7 u32 total
+        put_fixed_cstring(p, name, 52)
     p = bytearray()
-    put_u32(p, entity_id)
-    put_u32(p, appearance)
-    for _ in range(5):
-        put_u32(p, 0)
-    put_fixed_cstring(p, name, 52)
-    put_u16(p, 0); put_u16(p, 0)
-    p += b"\x00" * (50 * 80)
-    p += b"\x00"
+    entry(p)                       # +0x00 header/self entry
+    put_u16(p, count); put_u16(p, 0)  # +0x50 count, +0x52 pad
+    entry(p)                       # +0x54 object[0]
+    p += b"\x00" * (49 * 80)       # object[1..49]
+    p += b"\x00"                   # trailing string
     return frame(0x082D, p)
 
 
