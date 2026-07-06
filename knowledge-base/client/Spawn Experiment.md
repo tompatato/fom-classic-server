@@ -7,11 +7,29 @@ reference stub, and the server can inject it after world entry — but whether t
 client renders a **3D avatar** (vs. only a UI roster row) is **not yet confirmed**.
 Related: [[Session Opcodes]], [[Network Library]].
 
-> Status: 🟡 **Right opcode, wrong payload (2026-07-06).** Live injection rendered
-> nothing (see Result), but Ghidra shows `0x082D` *is* a real, handled message —
-> our injected body was simply mis-laid-out, so the client's deserializer produced
-> nothing. The fix is the correct struct layout, not a different opcode. See
-> "Ghidra findings".
+> Status: 🟡 **Root cause found — empty roster (2026-07-06).** `0x082D` is the right
+> handler, and the layout was essentially right too. The stub sent the array's
+> **object count = 0 with a zeroed array**, so the client had zero entities to
+> spawn. Fix applied in `SpawnZoneUpdate` (count = 1 + a populated `object[0]`);
+> live re-test pending. See "Deserializer".
+
+## Deserializer (entry format + root cause)
+
+The `0x082D` data class (slots 0–2 of vtable `PTR_FUN_100fa8fc`) confirms the
+struct, and the per-entry serializer `FUN_1009fd80` gives the entry format:
+
+- **Object array** of **50 × 80-byte entries** at message-object `+0x64`
+  (= payload `+0x54`), preceded by a **u16 count at `+0x60`** (payload `+0x50`),
+  byteswapped via `Ordinal_9`/`_15` (`htons`). Trailing string at payload `+0xFF4`.
+- **Each 80-byte entry** = 7× big-endian u32 (`Ordinal_8` = `htonl` on the first 6,
+  then `FUN_100a7ec0`) followed by a **52-byte name** — matching the stub's
+  "7×u32 + 52-byte name" note. Field 0 = id, field 1 = appearance.
+
+These payload offsets (count `+0x50`, objects `+0x54`, string `+0xFF4`) **match the
+stub's layout** once you account for the message object's `+0x10` base header. So
+the layout was fine — the stub just set **count = 0** and left every entry zeroed,
+giving the client an empty roster. `SpawnZoneUpdate` now writes `count = 1` and a
+populated `object[0]` (id, appearance, name).
 
 ## Ghidra findings (handler located)
 
@@ -36,7 +54,9 @@ off a count field and 80-byte slots elsewhere). So the stub's `0x082D` body was
 structurally wrong; the client accepted it (subscribed opcode) and deserialized
 garbage → no entity.
 
-**Conclusion:** `0x082D` is the correct handler; our packet layout is wrong.
+**Conclusion:** `0x082D` is the correct handler. The deserializer analysis below
+shows the *layout* was actually right — the real defect was an empty roster
+(count = 0), now fixed.
 
 ## What to try next
 
