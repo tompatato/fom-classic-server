@@ -43,9 +43,12 @@ public sealed class GameDispatcher(GameHost host)
                 return true;
 
             // Character loaded, or vort out of the apartment → hand off to the colony.
+            // Enter the world the client actually connected on (its port), not a
+            // hardcoded default — otherwise the client loads the wrong map.
             case PacketId.LOAD_CHAR:
             case PacketId.EXIT_APT:
-                await peer.SendAsync(new EnterWorld(Status: 4, DefaultWorld, Node: 1), ct);
+                WorldId world = peer.Player?.World ?? DefaultWorld;
+                await peer.SendAsync(new EnterWorld(Status: 4, world, Node: 1), ct);
                 if (_host.SpawnTest)
                 {
                     ScheduleSpawnInjection(peer, _host.SpawnDelay, ct);

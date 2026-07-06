@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
@@ -226,20 +227,41 @@ public sealed class GameHost
                 continue;
             }
 
-            ReadOnlySpan<byte> data = buffer.AsSpan(0, result.ReceivedBytes);
-            if (previous is not null && data.SequenceEqual(previous))
+            // Copy to a byte[] (not a Span) so it can survive the echo's await.
+            byte[] datagram = buffer[..result.ReceivedBytes];
+            if (previous is not null && datagram.AsSpan().SequenceEqual(previous))
             {
                 continue;
             }
-            previous = data.ToArray();
+            previous = datagram;
 
-            ushort opcode = data.Length >= 2 ? (ushort)((data[0] << 8) | data[1]) : (ushort)0;
-            MovementUpdate? move = MovementUpdate.TryParse(data);
+            ushort opcode = datagram.Length >= 2 ? (ushort)((datagram[0] << 8) | datagram[1]) : (ushort)0;
+            MovementUpdate? move = MovementUpdate.TryParse(datagram);
             if (move is { } update)
             {
                 _world.UpdatePosition(update.Session, update);
+
+                // Spawn experiment: echo the player's movement back as the clone
+                // entity (spawned via 0x082D with id = player id + 4242), offset in
+                // X so it stands beside the player and mirrors their motion. Sent
+                // from this port's socket to the client's own UDP endpoint.
+                if (SpawnTest)
+                {
+                    byte[] echo = (byte[])datagram.Clone();
+                    BinaryPrimitives.WriteUInt32BigEndian(echo.AsSpan(4), update.Session + 4242);
+                    ushort x = BinaryPrimitives.ReadUInt16BigEndian(echo.AsSpan(8));
+                    BinaryPrimitives.WriteUInt16BigEndian(echo.AsSpan(8), (ushort)(x + 0x100));
+                    try
+                    {
+                        await udp.SendToAsync(echo, SocketFlags.None, result.RemoteEndPoint, ct);
+                    }
+                    catch (SocketException)
+                    {
+                        // best-effort echo
+                    }
+                }
             }
-            _capture.Udp(port, opcode, data, handled: move is not null);
+            _capture.Udp(port, opcode, datagram, handled: move is not null);
             string suffix = move is { } m
                 ? $"  MOVE sess={m.Session} X={m.X} Y={m.Y} Z={m.Z} heading={m.Heading} (~{m.HeadingDegrees:F0}deg)"
                 : string.Empty;
