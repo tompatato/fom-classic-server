@@ -1,5 +1,3 @@
-using FOM.Protocol;
-
 namespace FOM.Server;
 
 /// <summary>
@@ -11,23 +9,9 @@ public static class PacketLog
     private static readonly Lock Gate = new();
     private static readonly bool Quiet = Environment.GetEnvironmentVariable("FOM_QUIET") == "1";
 
-    // Tentative opcode labels for readability; "?" where still unmapped.
-    private static readonly Dictionary<ushort, string> Names = new()
-    {
-        [(ushort)PacketId.LOGIN_REQUEST] = "LOGIN_REQUEST",
-        [(ushort)PacketId.LOGIN_RETURN] = "LOGIN_RETURN",
-        [(ushort)PacketId.LOAD_CHAR] = "LOAD_CHAR",
-        [(ushort)PacketId.PING] = "PING",
-        [(ushort)PacketId.ENTER_WORLD] = "ENTER_WORLD",
-        [(ushort)PacketId.EXIT_APT] = "EXIT_APT",
-        [(ushort)PacketId.ZONE_UPDATE] = "ZONE_UPDATE",
-        [(ushort)PacketId.CHAT] = "CHAT",
-        [(ushort)PacketId.MOVEMENT] = "MOVEMENT",
-    };
-
     public static void Packet(string direction, ClientSession peer, ushort opcode, ReadOnlySpan<byte> body)
     {
-        string name = Names.GetValueOrDefault(opcode, "?");
+        string name = OpcodeNames.Get(opcode);
         string header = $"conn#{peer.ConnId} {peer.World}:{peer.Port} {direction} " +
                         $"0x{opcode:X4} {name,-13} len={body.Length}";
         string text = Quiet || body.IsEmpty ? header : header + "\n" + HexDump(body);

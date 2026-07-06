@@ -16,6 +16,21 @@ import? 'local.just'
 _default:
     @just --list
 
+[group("server")]
+[doc('Run the game server (one service, all worlds). Pass CAPTURE=<file> to record a JSONL session.')]
+serve CAPTURE="":
+    FOM_CAPTURE="{{CAPTURE}}" dotnet run --project src/FOM.Server -c Release
+
+[group("server")]
+[doc('Summarize a JSONL capture: traffic, unmapped opcodes, errors.')]
+analyze FILE:
+    dotnet run --project src/FOM.Server -c Release -- analyze {{FILE}}
+
+[group("server")]
+[doc('Build and run all .NET tests.')]
+test:
+    dotnet test FOM.slnx
+
 [group("re")]
 [doc('Run the RE harness CLI (tools/re/fomre.py). e.g. `just re sym Player`')]
 re *ARGS:
