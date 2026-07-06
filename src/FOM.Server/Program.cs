@@ -15,6 +15,7 @@ string bind = Environment.GetEnvironmentVariable("FOM_BIND") ?? "127.0.0.1";
 int firstPort = int.TryParse(Environment.GetEnvironmentVariable("FOM_FIRST_PORT"), out int f) ? f : WorldPort.FirstPort;
 int lastPort = int.TryParse(Environment.GetEnvironmentVariable("FOM_LAST_PORT"), out int l) ? l : WorldPort.FirstPort + 45;
 string? capture = Environment.GetEnvironmentVariable("FOM_CAPTURE");
+bool spawnTest = Environment.GetEnvironmentVariable("FOM_SPAWN_TEST") == "1";
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -24,5 +25,5 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-var host = new GameHost(bind, firstPort, lastPort, capture);
+var host = new GameHost(bind, firstPort, lastPort, capture, spawnTest);
 await host.RunAsync(cts.Token);

@@ -62,6 +62,19 @@ def build_chat(sender_id, channel, name, msg):
     return frame(0x03EA, b)
 
 
+def build_spawn(entity_id, name, appearance):
+    p = bytearray()
+    put_u32(p, entity_id)
+    put_u32(p, appearance)
+    for _ in range(5):
+        put_u32(p, 0)
+    put_fixed_cstring(p, name, 52)
+    put_u16(p, 0); put_u16(p, 0)
+    p += b"\x00" * (50 * 80)
+    p += b"\x00"
+    return frame(0x082D, p)
+
+
 def login_return(header_id, status, hp, stam, psi, conc, uc, xp, bdgt, pp,
                  appearance, player_id, world, apt_tier, name, tag, desc):
     p = bytearray()
@@ -87,6 +100,7 @@ fixtures = {
         12345, 6, 100, 100, 100, 100, 1000, 100, 0, 10,
         APPEARANCE, 1001, 21, 1, "Neo", "", ""),
     "appearance": struct.pack(">I", APPEARANCE),  # raw u32, not framed
+    "spawn": build_spawn(4242, "CLONE", APPEARANCE),
 }
 
 print(json.dumps({name: bytes(data).hex().upper() for name, data in fixtures.items()}, indent=2))
