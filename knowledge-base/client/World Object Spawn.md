@@ -227,3 +227,27 @@ What each outcome tells us:
   a `CCharacter` via this path; read its caller to find the seeding message.
 - **Neither fires in normal play** → the snapshot needs a trigger we don't yet send;
   m19 is dormant until a second entity is announced.
+
+### Live capture result (2026-07-06)
+
+Attached at world entry (gdb, signal-safe) with the stub server (login → leave
+apartment). Observed:
+
+- **`FUN_10008080` SetAppearance fired for the local player** — char obj
+  `0xdad3c60`, appearance `0x71088820` (a real code: male, race nibble = 1). Its
+  caller is **`FUN_10038600`**, *not* `FUN_10035930`.
+- **`FUN_1003df00` ENTER_WORLD fired** (from OnMessage @ the `0x3EB` stub) — our
+  TCP `0x3EB` reaches the handler.
+- **`FUN_10035930` and the walker `FUN_10036fc0` never fired**, through world entry.
+
+**Conclusion — two distinct spawn paths:**
+- **Local player**: created via `ServerShell::OnClientEnterWorld` (m8) on the local
+  LithTech client-connect; appearance applied by `FUN_10038600`. This is why you
+  see *only* your own body.
+- **Remote players**: `FUN_10036fc0` (walker) → `FUN_10035930`. **Remote-only and
+  dormant** — never runs until the server delivers a world-state snapshot. The
+  walker is engine-invoked from `Lithtech.exe` (server.dll has no `+0x4c` call);
+  one of the 7 `IServerShell.Default`-lookup globals in the engine drives it.
+
+So making a second avatar appear = deliver the entity snapshot that drives the
+walker. Reusable known-good appearance code for a test entity: **`0x71088820`**.
