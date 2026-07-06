@@ -179,6 +179,7 @@ public sealed class GameHost
 
         byte[] buffer = new byte[65535];
         EndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+        byte[]? previous = null; // collapse identical consecutive frames (idle position spam)
         while (!ct.IsCancellationRequested)
         {
             SocketReceiveFromResult result;
@@ -196,7 +197,15 @@ public sealed class GameHost
             }
 
             ReadOnlySpan<byte> data = buffer.AsSpan(0, result.ReceivedBytes);
+            if (previous is not null && data.SequenceEqual(previous))
+            {
+                continue;
+            }
+            previous = data.ToArray();
+
+            ushort opcode = data.Length >= 2 ? (ushort)((data[0] << 8) | data[1]) : (ushort)0;
             MovementUpdate? move = MovementUpdate.TryParse(data);
+            _capture.Udp(port, opcode, data, handled: move is not null);
             string suffix = move is { } m
                 ? $"  MOVE sess={m.Session} X={m.X} Y={m.Y} Z={m.Z} heading={m.Heading} (~{m.HeadingDegrees:F0}deg)"
                 : string.Empty;
