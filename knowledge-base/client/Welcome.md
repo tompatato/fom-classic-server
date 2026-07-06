@@ -27,8 +27,10 @@ _Phase 0 recon in progress._
   direct-launch bypass, and the sound-init crash (recon Steps 0/3). ✅
 - [[Session Opcodes]] — login→world packet flow and the keepalive/ack bodies,
   confirmed against a live client session (recon Step 2). ✅
-- [[Spawn Experiment]] — the `0x082D` zone update as a candidate "spawn another
-  player" packet (gameplay 3c). ⚠️ unverified
+- [[Spawn Experiment]] — the `0x082D` zone update: it's the player-roster data
+  table, not the 3D-avatar spawn (gameplay 3c). 🔴
+- [[TCP Message Dispatch]] — the master opcode→handler map (`FUN_10079840`) and
+  the client's message subsystems. ✅
 - [[Network Library]] — custom protocol over raw Winsock (TCP + UDP), **not
   RakNet** (recon Step 1). ⭐ ✅
 - `Login Handshake` — connect + login wire format (recon Step 2).
