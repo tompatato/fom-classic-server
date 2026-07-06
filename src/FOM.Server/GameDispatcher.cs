@@ -46,12 +46,41 @@ public sealed class GameDispatcher(GameHost host)
             case PacketId.LOAD_CHAR:
             case PacketId.EXIT_APT:
                 await peer.SendAsync(new EnterWorld(Status: 4, DefaultWorld, Node: 1), ct);
+                if (_host.SpawnTest)
+                {
+                    ScheduleSpawnInjection(peer, _host.SpawnDelay, ct);
+                }
                 return true;
 
             default:
                 PacketLog.Line($"  ^ UNMAPPED opcode 0x{opcode:X4}");
                 return false;
         }
+    }
+
+    // Experiment (3c): after the client is in the world, inject a 0x082D zone update
+    // for a clone entity (id distinct from the player's) and see whether an avatar
+    // appears. Fire-and-forget; failures are logged, never fatal.
+    private static void ScheduleSpawnInjection(ClientSession peer, TimeSpan delay, CancellationToken ct)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(delay, ct);
+                uint cloneId = (peer.Player?.Id ?? 0) + 4242; // distinct from the player's own id
+                PacketLog.Line($"  [spawn-test] injecting 0x082D clone entity {cloneId}");
+                await peer.SendAsync(new SpawnZoneUpdate(cloneId, "CLONE", SpawnZoneUpdate.DefaultAppearance), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // server shutting down
+            }
+            catch (Exception e)
+            {
+                PacketLog.Line($"  [spawn-test] injection failed: {e.Message}");
+            }
+        }, ct);
     }
 
     private static LoginReturn BuildLoginReturn(Player player) => new(

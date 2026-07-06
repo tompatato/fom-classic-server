@@ -45,6 +45,10 @@ public class GoldenParityTests
     }
 
     [Fact]
+    public void Spawn_MatchesGolden() =>
+        AssertMatches("spawn", new SpawnZoneUpdate(4242, "CLONE", SpawnZoneUpdate.DefaultAppearance).ToFrame());
+
+    [Fact]
     public void Appearance_MatchesGolden()
     {
         byte[] raw = new byte[4];

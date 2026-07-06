@@ -14,10 +14,10 @@ public sealed class TestServer : IAsyncDisposable
     /// <summary>The running host — exposes <see cref="GameHost.World"/> for assertions.</summary>
     public GameHost Host { get; }
 
-    public TestServer(string? capturePath = null)
+    public TestServer(string? capturePath = null, bool spawnTest = false, double spawnDelaySeconds = 6)
     {
         Port = FreePort();
-        Host = new GameHost("127.0.0.1", Port, Port, capturePath);
+        Host = new GameHost("127.0.0.1", Port, Port, capturePath, spawnTest, spawnDelaySeconds);
         _run = Host.RunAsync(_cts.Token);
     }
 

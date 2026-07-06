@@ -28,6 +28,12 @@ public sealed class GameHost
     /// <summary>Who is online and where. The source of truth for game state.</summary>
     public WorldRegistry World => _world;
 
+    /// <summary>Experiment: inject a clone spawn (0x082D) after world entry.</summary>
+    public bool SpawnTest { get; }
+
+    /// <summary>How long after world entry to inject the experimental spawn.</summary>
+    public TimeSpan SpawnDelay { get; }
+
     /// <summary>Registers a newly-logged-in player and links it to the session.</summary>
     public Player RegisterPlayer(ClientSession session, string name)
     {
@@ -41,12 +47,15 @@ public sealed class GameHost
         return player;
     }
 
-    public GameHost(string bindAddress, int firstPort, int lastPort, string? capturePath = null)
+    public GameHost(string bindAddress, int firstPort, int lastPort, string? capturePath = null,
+                    bool spawnTest = false, double spawnDelaySeconds = 6)
     {
         _address = IPAddress.Parse(bindAddress);
         _firstPort = firstPort;
         _lastPort = lastPort;
         _capture = new CaptureLog(capturePath);
+        SpawnTest = spawnTest;
+        SpawnDelay = TimeSpan.FromSeconds(spawnDelaySeconds);
         _dispatcher = new GameDispatcher(this);
     }
 
