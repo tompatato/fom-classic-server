@@ -26,6 +26,11 @@ re *ARGS:
 re-test:
     python3 -m unittest discover -s tools/re/tests
 
+[group("client")]
+[doc('Redirect the staged client to a local server (patches Resources/CShell.dll in place, keeps a .orig backup). Set FOMC_GAME_DIR, or pass ADDR=<ip>. DXVK d3d9.dll must be fetched separately — see tools/patch/README.md.')]
+client-patch ADDR="127.0.0.1":
+    python3 tools/patch/localhost_patch.py --game-dir "{{GAME_DIR}}" --addr {{ADDR}} --backup
+
 [group("ghidra")]
 [doc('Rebuild the labeled Ghidra project at disassembly/ from committed JSON onto a fresh import of your game binaries. Set FOMC_CLIENT_MODULES + FOMC_GAME_DIR first.')]
 ghidra-gen:
