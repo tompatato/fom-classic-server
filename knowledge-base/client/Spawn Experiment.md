@@ -7,11 +7,17 @@ reference stub, and the server can inject it after world entry — but whether t
 client renders a **3D avatar** (vs. only a UI roster row) is **not yet confirmed**.
 Related: [[Session Opcodes]], [[Network Library]].
 
-> Status: 🟡 **Root cause found — empty roster (2026-07-06).** `0x082D` is the right
-> handler, and the layout was essentially right too. The stub sent the array's
-> **object count = 0 with a zeroed array**, so the client had zero entities to
-> spawn. Fix applied in `SpawnZoneUpdate` (count = 1 + a populated `object[0]`);
-> live re-test pending. See "Deserializer".
+> Status: 🔴 **`0x082D` is not the 3D-avatar spawn (2026-07-06).** Three live
+> variants — empty roster, `count=1` populated roster, and roster + mirrored UDP
+> movement for the entity — all rendered nothing, with the server verified to send
+> a valid packet each time. `0x082D` most likely populates a **UI roster/list**,
+> not a world avatar (as the stub author suspected). The real entity-spawn is a
+> different message; finding it needs decompiling the `0x082D` *consumer* (what
+> runs after deserialize) and the client's entity-creation path.
+>
+> Separately fixed along the way: **world routing** — the server now sends
+> `ENTER_WORLD` for the world the client actually connected on (was hardcoded
+> StsGenesis), so the client loads the correct map.
 
 ## Deserializer (entry format + root cause)
 
