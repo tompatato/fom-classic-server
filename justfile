@@ -31,6 +31,11 @@ analyze FILE:
 test:
     dotnet test FOM.slnx
 
+[group("server")]
+[doc('Live end-to-end check: start the server, launch the real client via Proton, capture, and analyze. Needs FOMC_GAME_DIR + Proton + a display. DURATION=<secs>.')]
+live-check DURATION="60":
+    DURATION={{DURATION}} tools/harness/live-client.sh
+
 [group("re")]
 [doc('Run the RE harness CLI (tools/re/fomre.py). e.g. `just re sym Player`')]
 re *ARGS:
