@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 using FOM.Protocol;
 using FOM.Protocol.Messages;
+using FOM.Server.Capture;
 
 namespace FOM.Server;
 
@@ -8,9 +9,10 @@ namespace FOM.Server;
 /// One connected TCP client. Wraps the socket so every send is framed and logged,
 /// and serializes concurrent sends (chat broadcasts arrive from other sessions).
 /// </summary>
-public sealed class ClientSession(Socket socket, int connId, int port)
+public sealed class ClientSession(Socket socket, int connId, int port, CaptureLog capture)
 {
     private readonly Socket _socket = socket;
+    private readonly CaptureLog _capture = capture;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
     public int ConnId { get; } = connId;
@@ -24,6 +26,7 @@ public sealed class ClientSession(Socket socket, int connId, int port)
     {
         byte[] frame = message.ToFrame();
         PacketLog.Packet("S->C", this, (ushort)message.Id, frame.AsSpan(PacketFrame.HeaderSize));
+        _capture.Packet("S->C", this, (ushort)message.Id, frame.AsSpan(PacketFrame.HeaderSize), handled: true);
 
         await _sendLock.WaitAsync(ct);
         try

@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using FOM.Protocol;
 using FOM.Protocol.Messages;
+using FOM.Server.Capture;
 
 namespace FOM.Server;
 
@@ -20,13 +21,15 @@ public sealed class GameHost
     private readonly int _lastPort;
     private readonly ConcurrentDictionary<int, ClientSession> _clients = new();
     private readonly GameDispatcher _dispatcher;
+    private readonly CaptureLog _capture;
     private int _connSeq;
 
-    public GameHost(string bindAddress, int firstPort, int lastPort)
+    public GameHost(string bindAddress, int firstPort, int lastPort, string? capturePath = null)
     {
         _address = IPAddress.Parse(bindAddress);
         _firstPort = firstPort;
         _lastPort = lastPort;
+        _capture = new CaptureLog(capturePath);
         _dispatcher = new GameDispatcher(this);
     }
 
@@ -42,6 +45,11 @@ public sealed class GameHost
         }
 
         PacketLog.Line($"FOM server listening on {_address}:{_firstPort}-{_lastPort} (TCP+UDP, one service)");
+        if (_capture.Enabled)
+        {
+            PacketLog.Line($"capturing session to JSONL");
+        }
+        _capture.Event("listen", detail: $"{_address}:{_firstPort}-{_lastPort}");
         try
         {
             await Task.WhenAll(loops);
@@ -49,6 +57,10 @@ public sealed class GameHost
         catch (OperationCanceledException)
         {
             // normal shutdown
+        }
+        finally
+        {
+            _capture.Dispose();
         }
     }
 
@@ -107,9 +119,10 @@ public sealed class GameHost
     private async Task HandleConnectionAsync(Socket socket, int port, CancellationToken ct)
     {
         int connId = Interlocked.Increment(ref _connSeq);
-        var session = new ClientSession(socket, connId, port);
+        var session = new ClientSession(socket, connId, port, _capture);
         _clients[connId] = session;
         PacketLog.Line($"conn#{connId} connected on {session.World}:{port} from {socket.RemoteEndPoint}");
+        _capture.Event("connect", connId, port);
 
         byte[] rent = ArrayPool<byte>.Shared.Rent(4096);
         var frames = new FrameBuffer();
@@ -136,7 +149,8 @@ public sealed class GameHost
                 while (frames.TryReadFrame(out ushort opcode, out byte[] body))
                 {
                     PacketLog.Packet("C->S", session, opcode, body);
-                    await _dispatcher.DispatchAsync(session, opcode, body, ct);
+                    bool handled = await _dispatcher.DispatchAsync(session, opcode, body, ct);
+                    _capture.Packet("C->S", session, opcode, body, handled);
                 }
             }
         }
@@ -146,6 +160,7 @@ public sealed class GameHost
             _clients.TryRemove(connId, out _);
             socket.Dispose();
             PacketLog.Line($"conn#{connId} disconnected ({session.World}:{port})");
+            _capture.Event("disconnect", connId, port);
         }
     }
 

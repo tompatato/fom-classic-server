@@ -16,7 +16,8 @@ public sealed class GameDispatcher(GameHost host)
 
     private readonly GameHost _host = host;
 
-    public async Task DispatchAsync(ClientSession peer, ushort opcode, byte[] body, CancellationToken ct)
+    /// <summary>Handles the packet and returns whether an opcode handler existed.</summary>
+    public async Task<bool> DispatchAsync(ClientSession peer, ushort opcode, byte[] body, CancellationToken ct)
     {
         switch ((PacketId)opcode)
         {
@@ -25,30 +26,30 @@ public sealed class GameDispatcher(GameHost host)
                 peer.Name = string.IsNullOrEmpty(request.Name) ? $"Player{peer.ConnId}" : request.Name;
                 PacketLog.Line($"  login as '{peer.Name}'");
                 await peer.SendAsync(BuildLoginReturn(peer), ct);
-                break;
+                return true;
 
             case PacketId.PING:
                 if (body.Length >= 4)
                 {
                     await peer.SendAsync(new Pong(BinaryPrimitives.ReadUInt32BigEndian(body)), ct);
                 }
-                break;
+                return true;
 
             case PacketId.CHAT:
                 ChatMessage chat = ChatMessage.Parse(body);
                 PacketLog.Line($"  CHAT [{peer.Name}] ch={chat.Channel}: '{chat.Message}'");
                 await _host.BroadcastAsync(new ChatBroadcast(chat.SenderId, chat.Channel, peer.Name, chat.Message), ct);
-                break;
+                return true;
 
             // Character loaded, or vort out of the apartment → hand off to the colony.
             case PacketId.LOAD_CHAR:
             case PacketId.EXIT_APT:
                 await peer.SendAsync(new EnterWorld(Status: 4, DefaultWorld, Node: 1), ct);
-                break;
+                return true;
 
             default:
                 PacketLog.Line($"  ^ UNMAPPED opcode 0x{opcode:X4}");
-                break;
+                return false;
         }
     }
 
