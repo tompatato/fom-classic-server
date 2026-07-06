@@ -25,6 +25,7 @@ BIND="${FOM_BIND:-127.0.0.1}"
 STEAMROOT="${STEAMROOT:-$HOME/.local/share/Steam}"
 PROTON="$STEAMROOT/steamapps/common/Proton - Experimental/proton"
 OUT="${OUT:-$(mktemp -d)}"
+mkdir -p "$OUT"   # created here: a caller-supplied OUT (unlike mktemp -d) may not exist yet
 CAP="$OUT/capture.jsonl"
 
 command -v dotnet >/dev/null || { echo "error: dotnet not found" >&2; exit 1; }
