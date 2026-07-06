@@ -20,9 +20,26 @@ public sealed class GameHost
     private readonly int _firstPort;
     private readonly int _lastPort;
     private readonly ConcurrentDictionary<int, ClientSession> _clients = new();
+    private readonly WorldRegistry _world = new();
     private readonly GameDispatcher _dispatcher;
     private readonly CaptureLog _capture;
     private int _connSeq;
+
+    /// <summary>Who is online and where. The source of truth for game state.</summary>
+    public WorldRegistry World => _world;
+
+    /// <summary>Registers a newly-logged-in player and links it to the session.</summary>
+    public Player RegisterPlayer(ClientSession session, string name)
+    {
+        var player = new Player(_world.AllocateId(), session)
+        {
+            Name = name,
+            World = session.World,
+        };
+        session.Player = player;
+        _world.Add(player);
+        return player;
+    }
 
     public GameHost(string bindAddress, int firstPort, int lastPort, string? capturePath = null)
     {
@@ -158,6 +175,10 @@ public sealed class GameHost
         {
             ArrayPool<byte>.Shared.Return(rent);
             _clients.TryRemove(connId, out _);
+            if (session.Player is { } player)
+            {
+                _world.Remove(player.Id);
+            }
             socket.Dispose();
             PacketLog.Line($"conn#{connId} disconnected ({session.World}:{port})");
             _capture.Event("disconnect", connId, port);
@@ -205,6 +226,10 @@ public sealed class GameHost
 
             ushort opcode = data.Length >= 2 ? (ushort)((data[0] << 8) | data[1]) : (ushort)0;
             MovementUpdate? move = MovementUpdate.TryParse(data);
+            if (move is { } update)
+            {
+                _world.UpdatePosition(update.Session, update);
+            }
             _capture.Udp(port, opcode, data, handled: move is not null);
             string suffix = move is { } m
                 ? $"  MOVE sess={m.Session} X={m.X} Y={m.Y} Z={m.Z} heading={m.Heading} (~{m.HeadingDegrees:F0}deg)"
