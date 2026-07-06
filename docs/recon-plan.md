@@ -15,17 +15,25 @@ Do not design servers or a project structure yet. Recon first.
 **Exit criteria:** the 2006 client is on disk at a known path, launchable, and its
 main modules identified.
 
-- [ ] Obtain the original 2006 *Face of Mankind* client (Duplex Systems). This is a
+- [x] Obtain the original 2006 *Face of Mankind* client (Duplex Systems). This is a
       standalone installer era — **not** the Steam/Proton shortcut the FotD client
       uses, so the runtime story is different (see Step 3).
-- [ ] Stage it **outside this repo**, at a path of your choosing, and reference it
+      → Have `fom_openbeta_v1213` (repackaged 2024; core modules dated 2005).
+- [x] Stage it **outside this repo**, at a path of your choosing, and reference it
       by absolute path from your notes. Client material is gitignored; never commit
       it.
-- [ ] Inventory the modules: main `.exe`, and any engine/UI DLLs (the FotD relaunch
+      → Staged at `/mnt/dev/FomClassic/client/fom_openbeta_v1213/` (sibling to the
+      repo). Set `FOMC_GAME_DIR` to it for `just` recipes.
+- [x] Inventory the modules: main `.exe`, and any engine/UI DLLs (the FotD relaunch
       splits into `fom_client.exe` + `CShell.dll` + `Object.lto`; the 2006 build's
       split is **unknown** — record what it actually is).
+      → Engine is **LithTech** (`Lithtech.exe` + `dtype{lay,pwr,std}.dll`), launched
+      via `FOM.exe`; game code in `Resources/CShell.dll` + `Object.lto` + `CRes.dll`;
+      a `server.dll` is also present. MSVC 7.1 runtime (VS2003 toolchain). The
+      `CShell.dll`/`Object.lto` split **mirrors** FotD — hypothesis source only.
 - [ ] Note file versions, timestamps, PE compile stamps, and any embedded version
-      strings.
+      strings. *(partial: filesystem timestamps + ImageBase noted; PE compile stamps
+      and version resources not yet pulled.)*
 
 > ⚠️ Record the module layout you find as fact. Do **not** assume it mirrors FotD.
 
@@ -64,9 +72,13 @@ Record findings in `knowledge-base/client/` (e.g. a `Network Library.md` note).
 **Exit criteria:** a documented byte-level login/connect flow for the 2006 client,
 with a first `knowledge-base/client/Login Handshake.md` note.
 
-- [ ] Identify how the client reaches its master/login server (command-line arg,
+- [x] Identify how the client reaches its master/login server (command-line arg,
       config file, hardcoded host?). The FotD client uses `+MasterServer <ip>`;
       the 2006 client's mechanism is unknown.
+      → **Hardcoded**: a table of ten IPv4 strings in `CShell.dll` `.rdata`
+      (`82.133.85.42–52`), just before the `NETMGRCL` marker. See
+      `knowledge-base/client/Network Address Table.md`. Master-vs-world role of the
+      ten slots still open.
 - [ ] Point it at a local endpoint. A **passive listener / packet sink** on the
       expected UDP port is enough to capture the first outbound packets — you do
       not need a working server to observe the connect + login request.

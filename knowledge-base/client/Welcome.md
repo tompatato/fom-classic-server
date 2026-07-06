@@ -19,8 +19,10 @@ Start new notes from [[_Template]].
 
 ## Index
 
-_Nothing documented yet — Phase 0 recon in progress. Expected early notes:_
+_Phase 0 recon in progress._
 
+- [[Network Address Table]] — the client's hardcoded server-address table in
+  `CShell.dll` and the localhost redirect (recon Step 2). ✅
 - `Network Library` — which net lib + version the client uses (recon Step 1). ⭐
 - `Login Handshake` — connect + login wire format (recon Step 2).
 - `Client Architecture` — module/engine split.
