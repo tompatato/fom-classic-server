@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/FOM.Protocol/FOM.Protocol.csproj" />
     <Project Path="src/FOM.Server/FOM.Server.csproj" />
+    <Project Path="src/FOM.TestClient/FOM.TestClient.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/FOM.ClientChecks.Tests/FOM.ClientChecks.Tests.csproj" />
