@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FOM.Protocol;
 
 namespace FOM.Server.Capture;
 
@@ -40,6 +41,29 @@ public sealed class CaptureLog : IDisposable
             Conn = peer.ConnId,
             Port = peer.Port,
             World = peer.World.ToString(),
+            Opcode = $"0x{opcode:X4}",
+            Name = OpcodeNames.Get(opcode),
+            Len = body.Length,
+            Hex = Convert.ToHexString(body),
+            Handled = handled,
+        });
+    }
+
+    /// <summary>Records a UDP datagram (no session; keyed by port). <paramref name="handled"/>
+    /// means we recognized/parsed it (e.g. a movement update).</summary>
+    public void Udp(int port, ushort opcode, ReadOnlySpan<byte> body, bool handled)
+    {
+        if (_writer is null)
+        {
+            return;
+        }
+
+        Write(new CaptureEntry
+        {
+            Event = "packet",
+            Dir = "C->S",
+            Port = port,
+            World = WorldPort.FromPort(port).ToString(),
             Opcode = $"0x{opcode:X4}",
             Name = OpcodeNames.Get(opcode),
             Len = body.Length,
