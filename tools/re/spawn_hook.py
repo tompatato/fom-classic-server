@@ -18,8 +18,10 @@
 import re
 
 GHIDRA_IMAGE_BASE = 0x10000000
-RVA_WALKER = 0x36fc0   # FUN_10036fc0
-RVA_SPAWN  = 0x35930   # FUN_10035930
+RVA_WALKER = 0x36fc0   # FUN_10036fc0  snapshot walker (spawns new chars)
+RVA_SPAWN  = 0x35930   # FUN_10035930  CreateObject CCharacter
+RVA_ENTER  = 0x3df00   # FUN_1003df00  ENTER_WORLD (0x3EB) handler — world-entry probe
+RVA_APPEAR = 0x8080    # FUN_10008080  SetAppearance(this, code) — common chokepoint
 MODULE_NEEDLE = "object.lto"
 
 
@@ -129,11 +131,49 @@ class _Spawn(gdb.Breakpoint):
         return False
 
 
+class _Enter(gdb.Breakpoint):
+    def stop(self):
+        sp = int(gdb.parse_and_eval("$sp"))
+        ret = _u32(sp)
+        print("\n=== FUN_1003df00 (ENTER_WORLD 0x3EB) — world entry ===")
+        print("  called from: %s" % _module_of(ret))
+        return False
+
+
+class _Appear(gdb.Breakpoint):
+    hits = 0
+    CAP = 12
+
+    def stop(self):
+        sp = int(gdb.parse_and_eval("$sp"))
+        ret = _u32(sp)
+        this = int(gdb.parse_and_eval("$ecx")) & 0xffffffff  # thiscall: this in ECX
+        code = _u32(sp + 4)                                    # param_1 = appearance code
+        print("\n=== FUN_10008080 SetAppearance hit #%d ===" % (_Appear.hits + 1))
+        print("  called from: %s" % _module_of(ret))
+        print("  this(char obj)=0x%x  appearance=0x%x" % (this, code))
+        _Appear.hits += 1
+        if _Appear.hits >= _Appear.CAP:
+            self.enabled = False
+            print("  (SetAppearance disarmed after %d hits)" % _Appear.CAP)
+        return False
+
+
 class FomHook(gdb.Command):
     def __init__(self):
         super().__init__("fom-hook", gdb.COMMAND_USER)
 
     def invoke(self, arg, from_tty):
+        # Wine/Proton uses these signals internally (SIGSEGV = page-fault-driven
+        # memory management, SIGUSR1/2 = thread suspend/resume, realtime sigs =
+        # glibc/pthread). gdb must pass them through without halting, or attaching
+        # during load freezes/kills the client. Keep SIGTRAP (our breakpoints).
+        for sig in ("SIGSEGV", "SIGUSR1", "SIGUSR2", "SIGPIPE", "SIGQUIT",
+                    "SIG32", "SIG33", "SIG34", "SIG35", "SIG36", "SIG37", "SIG38"):
+            try:
+                gdb.execute("handle %s nostop noprint pass" % sig, to_string=True)
+            except gdb.error:
+                pass
         base = _module_base(MODULE_NEEDLE)
         if base is None:
             print("Object.lto not mapped yet — enter the world first, then re-run fom-hook")
@@ -141,8 +181,10 @@ class FomHook(gdb.Command):
         print("Object.lto base = 0x%x" % base)
         _Walker("*0x%x" % (base + RVA_WALKER))
         _Spawn("*0x%x" % (base + RVA_SPAWN))
-        print("armed: walker@0x%x spawn@0x%x — continuing"
-              % (base + RVA_WALKER, base + RVA_SPAWN))
+        _Enter("*0x%x" % (base + RVA_ENTER))
+        _Appear("*0x%x" % (base + RVA_APPEAR))
+        print("armed: walker@0x%x spawn@0x%x enter@0x%x appear@0x%x — continuing"
+              % (base + RVA_WALKER, base + RVA_SPAWN, base + RVA_ENTER, base + RVA_APPEAR))
         gdb.execute("continue")
 
 
