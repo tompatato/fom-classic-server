@@ -31,7 +31,7 @@ public class CaptureIntegrationTests
             await stream.ReadExactlyAsync(header, ct); // wait for LOGIN_RETURN so we know it was processed
 
             // ... and an unmapped one (POLL keepalive, no handler).
-            await stream.WriteAsync(PacketFrame.Encode(PacketId.POLL_UNCONFIRMED, [0x00, 0x00]), ct);
+            await stream.WriteAsync(PacketFrame.Encode(PacketId.POLL, [0x00, 0x00]), ct);
 
             // Give the server a moment to record the second packet, then stop it.
             await WaitForAsync(() => File.Exists(capturePath) && File.ReadAllText(capturePath).Contains("0x0822"), ct);
@@ -44,7 +44,7 @@ public class CaptureIntegrationTests
             Assert.Equal(1, report.Connects);
             Assert.Contains(report.Traffic, t => t.Key == "C->S 0x07D1 LOGIN_REQUEST");
             Assert.Contains(report.Traffic, t => t.Key == "S->C 0x07D2 LOGIN_RETURN");
-            Assert.Contains(report.Unmapped, u => u.Key == "0x0822 POLL?");
+            Assert.Contains(report.Unmapped, u => u.Key == "0x0822 POLL");
         }
         finally
         {

@@ -16,10 +16,10 @@ public static class OpcodeNames
         [(ushort)PacketId.ZONE_UPDATE] = "ZONE_UPDATE",
         [(ushort)PacketId.CHAT] = "CHAT",
         [(ushort)PacketId.MOVEMENT] = "MOVEMENT",
-        [(ushort)PacketId.NODE_REQ_UNCONFIRMED] = "NODE_REQ?",
-        [(ushort)PacketId.POST_ENTER_UNCONFIRMED] = "POST_ENTER?",
-        [(ushort)PacketId.WORLD_LOADED_UNCONFIRMED] = "WORLD_LOADED?",
-        [(ushort)PacketId.POLL_UNCONFIRMED] = "POLL?",
+        [(ushort)PacketId.POLL] = "POLL",
+        [(ushort)PacketId.POST_ENTER] = "POST_ENTER",
+        [(ushort)PacketId.WORLD_LOADED] = "WORLD_LOADED",
+        [(ushort)PacketId.NODE_REQ] = "NODE_REQ",
         [(ushort)PacketId.KEEPALIVE30_UNCONFIRMED] = "KEEPALIVE30?",
     };
 
