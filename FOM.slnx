@@ -4,6 +4,7 @@
     <Project Path="src/FOM.Server/FOM.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/FOM.ClientChecks.Tests/FOM.ClientChecks.Tests.csproj" />
     <Project Path="tests/FOM.Protocol.Tests/FOM.Protocol.Tests.csproj" />
     <Project Path="tests/FOM.Server.Tests/FOM.Server.Tests.csproj" />
   </Folder>
