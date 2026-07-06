@@ -172,11 +172,13 @@ shell methods get invoked:
 
 ## What to try next
 
-1. **Decisive: dynamic analysis.** Break on `Object.lto!FUN_10036fc0` (and
-   `FUN_10035930`) in the live client, then read `param_1` (the snapshot buffer:
-   count@+0x14, 32-byte entries@+0x18) and walk the call stack up into the engine
-   to see which socket/channel produced it. That pins the exact transport + wire
-   layout in one shot, versus chasing the threaded dispatch statically.
+1. **Decisive: dynamic analysis (tooling ready — `tools/re/attach_spawn.sh`).**
+   Break on `Object.lto!FUN_10036fc0` (and `FUN_10035930`) in the live client, then
+   read `param_1` (the snapshot buffer: count@+0x14, 32-byte entries@+0x18) and the
+   caller (`[esp]` — the thunk *jumps* in, so the return address is the real engine
+   caller) to identify the socket/channel. See **Dynamic capture** below. That pins
+   the exact transport + wire layout in one shot, versus chasing the threaded
+   dispatch statically.
 2. Cross-check the C# server: the **local** player already spawns as a `CCharacter`
    via this machinery, so our server already emits whatever seeds the entity table.
    Confirm whether the local avatar is even rendered (third-person body) — if so,
@@ -203,3 +205,25 @@ shell methods get invoked:
 #   UDP receive:             decompile.py 0x0047dab0
 # helpers added this pass: find_vcalls.py <disp…>, find_indexed_calls.py
 ```
+
+### Dynamic capture (live client)
+
+Requires `ptrace_scope=0` and running as the same user as the client.
+
+```bash
+# 1. start the server, launch the client via Steam/Proton, LOG IN + ENTER THE WORLD
+#    (Object.lto only loads once the local server/world is up)
+# 2. attach + arm the spawn hook:
+tools/re/attach_spawn.sh              # finds Lithtech.exe, breaks on the spawn fns
+# gdb arms FUN_10036fc0 (snapshot walker) + FUN_10035930 (CCharacter create) and
+# continues. Each hit logs: caller module (= transport), snapshot count + entries
+# (id/type/x/z/y/flags/appearance). Ctrl-C then `quit` to detach.
+```
+
+What each outcome tells us:
+- **Walker fires, `called from:` = engine UDP code** → transport is the UDP
+  world-state channel; the buffer dump gives the wire layout to emit from `GameHost`.
+- **Only `FUN_10035930` fires (for your own player)** → confirms the local avatar is
+  a `CCharacter` via this path; read its caller to find the seeding message.
+- **Neither fires in normal play** → the snapshot needs a trigger we don't yet send;
+  m19 is dormant until a second entity is announced.
