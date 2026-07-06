@@ -22,8 +22,8 @@ main modules identified.
 - [x] Stage it **outside this repo**, at a path of your choosing, and reference it
       by absolute path from your notes. Client material is gitignored; never commit
       it.
-      → Staged at `/mnt/dev/FomClassic/client/fom_openbeta_v1213/` (sibling to the
-      repo). Set `FOMC_GAME_DIR` to it for `just` recipes.
+      → Staged outside the repo as `<your-stage-dir>/fom_openbeta_v1213/`; point
+      `FOMC_GAME_DIR` at it for the `just` recipes.
 - [x] Inventory the modules: main `.exe`, and any engine/UI DLLs (the FotD relaunch
       splits into `fom_client.exe` + `CShell.dll` + `Object.lto`; the 2006 build's
       split is **unknown** — record what it actually is).
