@@ -21,6 +21,7 @@ public enum PacketId : ushort
     ENTER_WORLD   = 0x03EB, // S->C  world handoff
     EXIT_APT      = 0x081C, // C->S  vort out of apartment into the colony
     ZONE_UPDATE   = 0x082D, // S->C  zone/roster update (spawn entries)
+    SPAWN_MEETINGPOINT = 0x03FE, // S->C  spawn a CMeetingPoint world object (Object.lto FUN_10034740)
 
     // --- Chat ---
     CHAT          = 0x03EA, // both  chat message (server relays to peers)

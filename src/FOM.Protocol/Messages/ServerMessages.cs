@@ -73,6 +73,29 @@ public sealed record EnterWorld(uint Status, WorldId World, ushort Node) : IServ
     }
 }
 
+/// <summary>
+/// <see cref="PacketId.SPAWN_MEETINGPOINT"/> (0x3FE) — spawns a <c>CMeetingPoint</c>
+/// world object (flag_station) at a position. Derived from Object.lto's ServerShell
+/// handler <c>FUN_10034740</c>: the body deserializes into fields at struct+0x10 as
+/// <c>id (u32) · x (u16) · y (u16) · z (u16) · name (char[32])</c> (big-endian), and
+/// the handler calls <c>CreateObject("CMeetingPoint")</c> at that position. This is
+/// the first server-driven world-object spawn — a proof that our server can make the
+/// client instantiate a world object. See <c>knowledge-base/client/World Object Spawn.md</c>.
+/// </summary>
+public sealed record SpawnMeetingPoint(uint EntityId, ushort X, ushort Y, ushort Z, string Name) : IServerMessage
+{
+    public PacketId Id => PacketId.SPAWN_MEETINGPOINT;
+
+    public void WriteBody(PacketWriter w)
+    {
+        w.WriteU32(EntityId);
+        w.WriteU16(X);
+        w.WriteU16(Y);
+        w.WriteU16(Z);
+        w.WriteFixedCString(Name, 32);
+    }
+}
+
 /// <summary><see cref="PacketId.PING"/> reply — echoes the client's timestamp (stub <c>pong</c>).</summary>
 public sealed record Pong(uint Timestamp) : IServerMessage
 {

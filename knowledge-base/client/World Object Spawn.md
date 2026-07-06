@@ -251,3 +251,27 @@ apartment). Observed:
 
 So making a second avatar appear = deliver the entity snapshot that drives the
 walker. Reusable known-good appearance code for a test entity: **`0x71088820`**.
+
+### ✅ First server-driven spawn — CMeetingPoint via `0x3FE` (2026-07-06)
+
+Implemented `SpawnMeetingPoint` (server `0x3FE`) and injected it after world entry.
+**A `flag_station` object rendered in the world at the player's position** (named
+"TESTFLAG"). Hook confirmed the handler `FUN_10034740` received the exact bytes:
+
+```
+03fe 002a 00001093 007f 003b 0dff 54455354464c4147 00…
+op   len  id       x    y    z    "TESTFLAG"
+```
+
+Confirmed facts:
+- **Wire body of an Object.lto entity message = fields from struct+0x10, in order,
+  big-endian.** For `0x3FE`: `id (u32) · x (u16) · y (u16) · z (u16) · name (char[32])`.
+  The client validates opcode + size (≤ capacity `0x2c`), then `CreateObject`s.
+- **Entity position uses the same coordinate system as UDP movement `0x03F3`** —
+  sending the player's last-known movement X/Y/Z placed the object exactly on them.
+- This is the general recipe for the other per-type spawns (`0x3FD` CAdvertisement,
+  etc.): one opcode per object class, `CreateObject` in the handler.
+
+This proves server→client world-object spawning. **Characters are still the one
+gap** — they have no per-type opcode (only the engine-invoked walker), so the
+remaining work is triggering the walker with a character snapshot.

@@ -71,9 +71,13 @@ public sealed class GameDispatcher(GameHost host)
             try
             {
                 await Task.Delay(delay, ct);
-                uint cloneId = (peer.Player?.Id ?? 0) + 4242; // distinct from the player's own id
-                PacketLog.Line($"  [spawn-test] injecting 0x082D clone entity {cloneId}");
-                await peer.SendAsync(new SpawnZoneUpdate(cloneId, "CLONE", SpawnZoneUpdate.DefaultAppearance), ct);
+                uint entityId = (peer.Player?.Id ?? 0) + 4242; // distinct from the player's own id
+                // Spawn a CMeetingPoint (0x3FE) at the player's last-known position — the
+                // first server-driven world-object spawn (see World Object Spawn.md).
+                MovementUpdate? at = peer.Player?.LastMovement;
+                ushort x = at?.X ?? 0, y = at?.Y ?? 0, z = at?.Z ?? 0;
+                PacketLog.Line($"  [spawn-test] injecting 0x03FE CMeetingPoint id={entityId} at x={x} y={y} z={z}");
+                await peer.SendAsync(new SpawnMeetingPoint(entityId, x, y, z, "TESTFLAG"), ct);
             }
             catch (OperationCanceledException)
             {
