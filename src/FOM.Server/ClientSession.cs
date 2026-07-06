@@ -22,6 +22,9 @@ public sealed class ClientSession(Socket socket, int connId, int port, CaptureLo
     /// <summary>Set from the login username; used as the chat display name.</summary>
     public string Name { get; set; } = "Player";
 
+    /// <summary>The player this connection is logged in as, once LOGIN_REQUEST arrives.</summary>
+    public Player? Player { get; set; }
+
     public async Task SendAsync(IServerMessage message, CancellationToken ct = default)
     {
         byte[] frame = message.ToFrame();

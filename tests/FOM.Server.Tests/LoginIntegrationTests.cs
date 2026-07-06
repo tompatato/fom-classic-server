@@ -38,8 +38,8 @@ public class LoginIntegrationTests
         byte[] body = new byte[bodyLength];
         await stream.ReadExactlyAsync(body, ct);
 
-        // Player id echoed at +0x24 (1000 + connId; first connection => 1001).
-        Assert.Equal(1001u, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0x24)));
+        // Player id at +0x24 comes from the world registry; first player => 1.
+        Assert.Equal(1u, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0x24)));
         // Name round-trips at +0x5A.
         var reader = new PacketReader(body.AsSpan(0x5A));
         Assert.Equal("Neo", reader.ReadFixedCString(LoginReturn.NameLength));

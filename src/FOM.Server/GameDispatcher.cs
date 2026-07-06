@@ -24,8 +24,9 @@ public sealed class GameDispatcher(GameHost host)
             case PacketId.LOGIN_REQUEST:
                 LoginRequest request = LoginRequest.Parse(body);
                 peer.Name = string.IsNullOrEmpty(request.Name) ? $"Player{peer.ConnId}" : request.Name;
-                PacketLog.Line($"  login as '{peer.Name}'");
-                await peer.SendAsync(BuildLoginReturn(peer), ct);
+                Player player = _host.RegisterPlayer(peer, peer.Name);
+                PacketLog.Line($"  login as '{peer.Name}' (player {player.Id}, {player.World})");
+                await peer.SendAsync(BuildLoginReturn(player), ct);
                 return true;
 
             case PacketId.PING:
@@ -53,15 +54,15 @@ public sealed class GameDispatcher(GameHost host)
         }
     }
 
-    private static LoginReturn BuildLoginReturn(ClientSession peer) => new(
-        HeaderId: LoginReturn.DefaultHeaderId,
+    private static LoginReturn BuildLoginReturn(Player player) => new(
+        HeaderId: player.Id,   // entity/session id — echoed by the client in movement
         Status: 6,
         Stats: new LoginStats(Hp: 100, Stam: 100, Psi: 100, Conc: 100, Uc: 1000, Xp: 100, Bdgt: 0, Pp: 10),
         AppearanceCode: Appearance.Pack(rank: 7, faction: 1, female: false, leg: 1, arm: 1, torso: 1, head: 1, model: 0),
-        PlayerId: (uint)(1000 + peer.ConnId),
-        World: DefaultWorld,
+        PlayerId: player.Id,
+        World: player.World,
         AptTier: 1,
-        Name: peer.Name,
+        Name: player.Name,
         Tag: string.Empty,
         Description: string.Empty);
 }
