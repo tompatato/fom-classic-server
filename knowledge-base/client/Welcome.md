@@ -25,6 +25,8 @@ _Phase 0 recon in progress._
   `CShell.dll` and the localhost redirect (recon Step 2). ✅
 - [[Launcher Bootstrap]] — how `FOM.exe` version-checks and spawns the engine, the
   direct-launch bypass, and the sound-init crash (recon Steps 0/3). ✅
+- [[Session Opcodes]] — login→world packet flow and the keepalive/ack bodies,
+  confirmed against a live client session (recon Step 2). ✅
 - [[Network Library]] — custom protocol over raw Winsock (TCP + UDP), **not
   RakNet** (recon Step 1). ⭐ ✅
 - `Login Handshake` — connect + login wire format (recon Step 2).

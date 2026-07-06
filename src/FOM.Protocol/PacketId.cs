@@ -28,10 +28,13 @@ public enum PacketId : ushort
     // --- Movement (UDP channel) ---
     MOVEMENT      = 0x03F3, // C->S  position/heading update
 
-    // --- Observed, not yet fully mapped ---
-    NODE_REQ_UNCONFIRMED     = 0x03E9, // C->S  after colony entry (u32=76)
-    POST_ENTER_UNCONFIRMED   = 0x0809, // C->S  one-shot after apt entry
-    WORLD_LOADED_UNCONFIRMED = 0x081A, // C->S  right after ENTER_WORLD (u32=5)
-    POLL_UNCONFIRMED         = 0x0822, // C->S  pre-login + every ~10s keepalive
-    KEEPALIVE30_UNCONFIRMED  = 0x083B, // C->S  every ~30s
+    // --- Session keepalives / acks (bodies confirmed against a live 2006-client
+    // capture; fire-and-forget — the client needs no response) ---
+    POLL         = 0x0822, // C->S  pre-login + periodic keepalive; body u16 = 0
+    POST_ENTER   = 0x0809, // C->S  one-shot after apartment entry; body u16 = 0
+    WORLD_LOADED = 0x081A, // C->S  ack after ENTER_WORLD; body u32 = 5, u32 = 0
+    NODE_REQ     = 0x03E9, // C->S  after colony entry; body u32 = 76
+
+    // Still not observed in a capture:
+    KEEPALIVE30_UNCONFIRMED = 0x083B, // C->S  ~30s keepalive (body presumed u16 = 0)
 }
