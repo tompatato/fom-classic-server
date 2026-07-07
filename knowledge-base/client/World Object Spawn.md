@@ -373,10 +373,20 @@ exact engine trigger is blocked statically by vtable-offset collision.
 ### ➡️ Next: decouple the two unknowns dynamically
 
 The remaining unknowns are **(a) the entry/buffer format** and **(b) the transport
-that makes the engine call m19**. Solve (a) independently of (b) with gdb: attach,
-then **manually invoke the walker** on a hand-built buffer —
-`call ((int(*)(void*,void*))0x<walker>)(DAT_100b42f0, &buf)` with `buf` = our 32-byte
-entry layout (`count@+0x14`, entry@+0x18). If an avatar renders, the entry format is
+that makes the engine call m19**. Solve (a) independently of (b) with gdb by
+**manually invoking the walker** on a hand-built buffer. Tooling: `tools/re/invoke_walker.py`
+(+ `invoke_walker.sh` wrapper). It mallocs a buffer in the inferior, writes
+`count=1 @+0x14` and one 32-byte entry `@+0x18` (id/type, packed pos, flags,
+appearance — native LE, as the walker reads raw), sets `ECX = DAT_100b42f0`
+(thiscall `this`), and calls `FUN_10036fc0(buf)`; a logging breakpoint on
+`FUN_10035930` reports whether the CCharacter creator was reached.
+
+```bash
+# client in-world, then:
+tools/re/invoke_walker.sh <x> <y> <z>     # coords from the server's latest MOVE log
+```
+
+If an avatar renders (and the creator breakpoint fires), the entry format is
 **confirmed** and only transport (b) remains; if not, fix the fields the walker reads
 and retry. This turns the hard transport question into a checkable one. For (b) the
 likely path is reversing the engine UDP recv `Lithtech.exe!FUN_0047dab0` → its async
