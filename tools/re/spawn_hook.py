@@ -25,6 +25,13 @@ RVA_APPEAR = 0x8080    # FUN_10008080  SetAppearance(this, code) — common chok
 RVA_MEETING = 0x34740  # FUN_10034740  0x3FE CMeetingPoint spawn handler (server-driven test)
 MODULE_NEEDLE = "object.lto"
 
+# Engine (Lithtech.exe) — is FoM's inbound traffic even flowing through LithTech's
+# bit-packed netmgr, or does FoM bypass it? Break on the engine UDP recv to find out
+# (see "TRANSPORT RE" in World Object Spawn.md). RVA = Ghidra VA 0x47dab0 - PE image
+# base 0x400000; runtime addr = mapped base + RVA (same as the Object.lto breakpoints).
+ENGINE_NEEDLE = "lithtech.exe"
+RVA_ENGINE_RECV = 0x7dab0  # FUN_0047dab0  engine UDP recvfrom -> bit-packed ILTMessage
+
 
 def _pid():
     return gdb.selected_inferior().pid
@@ -177,6 +184,24 @@ class _Meeting(gdb.Breakpoint):
         return False
 
 
+class _Recv(gdb.Breakpoint):
+    """Engine UDP recv. If this fires while our plain server runs, FoM's inbound
+    traffic flows through LithTech netmgr; if it never fires, FoM bypasses it."""
+    hits = 0
+    CAP = 8  # fires per datagram; log a few then disarm so the game stays smooth
+
+    def stop(self):
+        sp = int(gdb.parse_and_eval("$sp"))
+        ret = _u32(sp)
+        print("\n=== Lithtech.exe!FUN_0047dab0 (engine UDP recv) hit #%d ===" % (_Recv.hits + 1))
+        print("  called from: %s" % _module_of(ret))
+        _Recv.hits += 1
+        if _Recv.hits >= _Recv.CAP:
+            self.enabled = False
+            print("  (engine-recv disarmed after %d hits; netmgr IS the inbound path)" % _Recv.CAP)
+        return False  # log and auto-continue
+
+
 class FomHook(gdb.Command):
     def __init__(self):
         super().__init__("fom-hook", gdb.COMMAND_USER)
@@ -202,9 +227,18 @@ class FomHook(gdb.Command):
         _Enter("*0x%x" % (base + RVA_ENTER))
         _Appear("*0x%x" % (base + RVA_APPEAR))
         _Meeting("*0x%x" % (base + RVA_MEETING))
-        print("armed: walker@0x%x spawn@0x%x enter@0x%x appear@0x%x meeting@0x%x — continuing"
+        print("armed: walker@0x%x spawn@0x%x enter@0x%x appear@0x%x meeting@0x%x"
               % (base + RVA_WALKER, base + RVA_SPAWN, base + RVA_ENTER, base + RVA_APPEAR,
                  base + RVA_MEETING))
+        # Also watch the engine UDP recv, to settle whether FoM uses LithTech netmgr.
+        ebase = _module_base(ENGINE_NEEDLE)
+        if ebase is not None:
+            recv = ebase + RVA_ENGINE_RECV
+            _Recv("*0x%x" % recv)
+            print("armed: engine-recv@0x%x (Lithtech.exe base 0x%x)" % (recv, ebase))
+        else:
+            print("Lithtech.exe not mapped — engine-recv not armed")
+        print("continuing")
         gdb.execute("continue")
 
 
