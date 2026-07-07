@@ -495,3 +495,48 @@ state — and that state is seeded by **FoM's own code** on inbound app traffic.
    entity", so the character-*add* sibling is the target.
 3. Reconsider what actually invokes m19 per tick (the engine server-update path), now
    that the netmgr hypothesis is dead.
+
+### 🔎 FoM-SIDE HUNT (2026-07-07): no app-opcode path feeds the walker
+
+Swept the remaining unmapped OnMessage (m18, TCP) handlers and FoM's own recv:
+
+- **No `recvfrom`/`recv` refs in Object.lto or CShell.dll** — FoM's UDP socket isn't
+  read by app-DLL code via ws2_32 by name (consistent with movement being
+  fire-and-forget client→server; server→client is TCP).
+- **Newly mapped handler — `0x3EE` `FUN_10034370` = cItem batch spawn.** Deserialize
+  → `count` (`local_2010`) → loop over entries → per-entry: look up in the object
+  manager `DAT_100b42e0` (`FUN_10004e50`); if absent, **`CreateObject` class
+  "cItem"** (`DAT_100b4280[0x170]("cItem")` + `[0x180]` create) at the entry's pos.
+  So OnMessage handlers *can* batch-create objects directly over TCP — but this one
+  makes **items, not characters**.
+- `0x3FF` `FUN_100351d0` = a live-object-manager reconcile loop (walks
+  `DAT_100b42e0`); `0x3F7`/`0x3F8` = per-entity ops (id-lookup + obj-mgr); `0x3F9`,
+  `0x3EF`, `0x3F6` = misc. **None creates a `CCharacter`, calls the walker
+  `FUN_10036fc0`, or writes a 32-byte-entry snapshot buffer.**
+
+**Conclusion: no FoM app-opcode handler (TCP OnMessage) creates characters or feeds
+the walker.** Characters remain exclusively walker-driven (m19), the walker is
+engine-invoked, netmgr is bypassed, and nothing in the app layer supplies its
+buffer. Static analysis has now exhausted the cheap leads.
+
+### 🧭 Honest status + realistic options
+
+The blocker is a chicken-and-egg: the decisive evidence (the walker's caller +
+buffer) is only observable when the walker actually fires, which needs real
+character data our server can't yet produce. Remaining paths, in rough
+effort/payoff order:
+
+1. **Dynamic capture with a real second entity.** Get the walker to fire once with
+   the safe logging hook armed (`spawn_hook.py` already breaks on it) — e.g. against
+   any reference/retail 2006 server, or a captured session — and read `[esp]`
+   (engine caller) + the buffer at `+0x14`/`+0x18`. One hit pins both transport and
+   format. **Highest payoff; needs a source of real remote players.**
+2. **Reverse the engine shell-dispatch** in Lithtech.exe: enumerate every global
+   holding the ServerShell (vtable `Object.lto!0x10087030`) and find the one whose
+   `+0x4c` is called (the `+0x4c` grep is noisy, but cross-referencing "reads a
+   shell-ptr global AND calls `+0x4c`" narrows it). Hard, partially done.
+3. **Accept the current capability boundary:** our server can spawn **world objects**
+   (per-type OnMessage: `0x3FE` CMeetingPoint proven; `0x3EE` cItem batch now mapped;
+   `0x3FD` CAdvertisement etc. likely follow the same recipe) but **not player
+   avatars**, and pivot to building out world-object / gameplay features that don't
+   depend on the walker.
