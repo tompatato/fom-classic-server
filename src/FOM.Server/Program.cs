@@ -17,6 +17,8 @@ int lastPort = int.TryParse(Environment.GetEnvironmentVariable("FOM_LAST_PORT"),
 string? capture = Environment.GetEnvironmentVariable("FOM_CAPTURE");
 bool spawnTest = Environment.GetEnvironmentVariable("FOM_SPAWN_TEST") == "1";
 bool snapshotTest = Environment.GetEnvironmentVariable("FOM_SNAPSHOT_TEST") == "1";
+bool snapshotRepeat = Environment.GetEnvironmentVariable("FOM_SNAPSHOT_REPEAT") == "1";
+double spawnDelay = double.TryParse(Environment.GetEnvironmentVariable("FOM_SPAWN_DELAY"), out double d) ? d : 6;
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -26,5 +28,6 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-var host = new GameHost(bind, firstPort, lastPort, capture, spawnTest, snapshotTest: snapshotTest);
+var host = new GameHost(bind, firstPort, lastPort, capture, spawnTest, spawnDelay,
+    snapshotTest: snapshotTest, snapshotRepeat: snapshotRepeat);
 await host.RunAsync(cts.Token);

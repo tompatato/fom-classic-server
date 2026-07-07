@@ -43,6 +43,16 @@ public sealed class GameHost
     /// </summary>
     public bool SnapshotTest { get; }
 
+    /// <summary>
+    /// Debug aid for live gdb hooking: when set, the snapshot is resent periodically
+    /// (throttled) instead of once, so an attached hook catches the walker regardless
+    /// of when it armed relative to the player's first movement.
+    /// </summary>
+    public bool SnapshotRepeat { get; }
+
+    /// <summary>Minimum gap between resends in <see cref="SnapshotRepeat"/> mode.</summary>
+    private static readonly TimeSpan SnapshotResendInterval = TimeSpan.FromMilliseconds(500);
+
     /// <summary>Registers a newly-logged-in player and links it to the session.</summary>
     public Player RegisterPlayer(ClientSession session, string name)
     {
@@ -57,7 +67,8 @@ public sealed class GameHost
     }
 
     public GameHost(string bindAddress, int firstPort, int lastPort, string? capturePath = null,
-                    bool spawnTest = false, double spawnDelaySeconds = 6, bool snapshotTest = false)
+                    bool spawnTest = false, double spawnDelaySeconds = 6, bool snapshotTest = false,
+                    bool snapshotRepeat = false)
     {
         _address = IPAddress.Parse(bindAddress);
         _firstPort = firstPort;
@@ -66,6 +77,7 @@ public sealed class GameHost
         SpawnTest = spawnTest;
         SpawnDelay = TimeSpan.FromSeconds(spawnDelaySeconds);
         SnapshotTest = snapshotTest;
+        SnapshotRepeat = snapshotRepeat;
         _dispatcher = new GameDispatcher(this);
     }
 
@@ -299,11 +311,24 @@ public sealed class GameHost
     // spawn walker fires a second avatar appears next to the player rather than inside.
     private async Task MaybeSendSnapshotAsync(Socket udp, EndPoint client, MovementUpdate at, CancellationToken ct)
     {
-        if (!_world.TryGet(at.Session, out Player? player) || player is null || player.SnapshotSent)
+        if (!_world.TryGet(at.Session, out Player? player) || player is null)
         {
             return;
         }
+        if (SnapshotRepeat)
+        {
+            // Resend on a throttle so a live gdb hook can't miss the walker call.
+            if (DateTime.UtcNow - player.LastSnapshotAt < SnapshotResendInterval)
+            {
+                return;
+            }
+        }
+        else if (player.SnapshotSent)
+        {
+            return; // one-shot
+        }
         player.SnapshotSent = true;
+        player.LastSnapshotAt = DateTime.UtcNow;
 
         uint entityId = player.Id + SnapshotCharacterIdOffset;
         ushort x = (ushort)(at.X + 0x100); // offset in X so it stands beside the player

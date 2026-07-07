@@ -301,13 +301,47 @@ walker reads the buffer as a native x86 struct (it never calls the deserializer
 `FUN_10041890`) — the one hard inference; everything else (header, routing opcode,
 whether it's UDP at all) is a hypothesis this experiment tests.
 
-**To run:** rebuild Release, start with `FOM_SNAPSHOT_TEST=1`, launch the client,
-enter world, **move**, and arm the gdb hook (`tools/re/attach_spawn.sh`). Decision
-matrix:
-- **Walker fires + 2nd avatar renders** → transport + layout correct; remote spawn
-  solved.
-- **Walker fires but no spawn** → dump its buffer; a field/endianness is off
-  (retry big-endian, or fix the `count`/entry offset the hook reveals).
-- **Walker never fires** → wrong transport/routing for m19; the datagram isn't
-  reaching it. Next: capture what the engine *does* feed m19, or try the reliable
-  channel / a different candidate opcode.
+**To run:** rebuild Release, start with `FOM_SNAPSHOT_TEST=1` (add
+`FOM_SNAPSHOT_REPEAT=1` to resend every 500 ms so a live hook can't miss it), launch
+the client, enter world, **move**, and arm the gdb hook (`tools/re/attach_spawn.sh <pid>`
+— pass the **real** in-world pid; `pgrep` also matches Steam's `reaper` wrapper, so
+pick the pid whose `/proc/<pid>/maps` contains `Object.lto`).
+
+### ❌ LIVE RESULT (2026-07-07): app-UDP does NOT drive the walker
+
+Ran it against the live client with the hook armed and a **positive control**
+(`FOM_SPAWN_TEST=1` → the proven `0x3FE` CMeetingPoint). Hits over the session:
+
+| breakpoint | fired | meaning |
+| --- | --- | --- |
+| `FUN_10034740` (0x3FE CMeetingPoint) | **3** | positive control — flag rendered; TCP OnMessage path + hook both live |
+| `FUN_1003df00` (ENTER_WORLD 0x3EB) | 3 | our TCP `0x3EB` reaches its handler |
+| `FUN_10008080` (SetAppearance) | 2 | local player, appearance `0x71088820` |
+| **`FUN_10036fc0` (snapshot walker)** | **0** | — |
+| `FUN_10035930` (CCharacter create) | 0 | — |
+
+**111 snapshots were sent over UDP; the walker fired 0 times.** The datagram *is*
+delivered to the client's socket — the client's movement socket is a **connected**
+UDP socket (`ESTAB 127.0.0.1:<eph> → 127.0.0.1:<worldport>`), and our reply goes out
+from the world-port socket, so its source matches the connected peer and the kernel
+accepts it. So the LithTech **engine receives our datagram but does not route it to
+ServerShell m19.** The candidate `0x03F3`-framed app datagram is the wrong thing.
+
+**Conclusion — the character snapshot is not an app-opcode UDP datagram.** App
+opcodes (`0x3EA`–`0x3FF`, `0x7xx`) ride the **reliable TCP** channel into OnMessage
+(m18 = `FUN_100371d0`) — that's how `0x3FE` and `0x3EB` got in and rendered. The
+snapshot buffer that m19 walks must be **populated by one of the other OnMessage
+handlers** (TCP), after which the engine's m19 pass spawns the entries — *not* raw
+UDP. (Movement `0x3F3` being UDP is a red herring: it's the client's outbound app
+data, not the engine's inbound replication.)
+
+### ➡️ Next (static Ghidra, not live)
+
+Find which OnMessage handler **writes** the snapshot buffer that `FUN_10036fc0`
+reads. The walker reads `snapshot+0x14` (count) / `+0x18` (entries) off the session
+object `DAT_100b42f0` (or a global). Search for the FUN_ that *stores* into that same
+buffer among the still-unmapped `0x3EA`–`0x3FF` handlers (`0x3EA` `FUN_10034ca0`,
+`0x3EE`, `0x3EF`, `0x3F1` `FUN_10036bf0`, `0x3F6`–`0x3F9`, `0x3FC` `FUN_100355e0`,
+`0x3FF` `FUN_100351d0`) — `0x3F5` is already "appearance update for an existing
+entity", so the character-*add* opcode is likely a sibling. Then deliver that opcode
+over TCP the same way `SpawnMeetingPoint` works.
