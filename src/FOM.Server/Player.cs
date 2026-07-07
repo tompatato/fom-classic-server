@@ -29,4 +29,10 @@ public sealed class Player(uint id, ClientSession session)
     /// world-state snapshot, so it fires only once (see <see cref="GameHost"/>).
     /// </summary>
     public bool SnapshotSent { get; set; }
+
+    /// <summary>
+    /// When the last experimental snapshot was pushed to this player. Used to throttle
+    /// the repeat mode (<c>FOM_SNAPSHOT_REPEAT</c>) that resends for a live gdb hook.
+    /// </summary>
+    public DateTime LastSnapshotAt { get; set; } = DateTime.MinValue;
 }
