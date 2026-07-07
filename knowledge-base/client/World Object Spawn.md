@@ -275,3 +275,39 @@ Confirmed facts:
 This proves server→client world-object spawning. **Characters are still the one
 gap** — they have no per-type opcode (only the engine-invoked walker), so the
 remaining work is triggering the walker with a character snapshot.
+
+### 🔬 Character-snapshot experiment — apparatus (2026-07-07)
+
+Built the server side to drive the walker `FUN_10036fc0`. `FOM_SNAPSHOT_TEST=1`
+makes `GameHost` push a **single character world-state snapshot** to a player over
+**UDP** (once, right after they start sending movement), placing a second character
+beside them (`id = playerId + 4243`, position = player's last movement with X+0x100,
+appearance `0x71088820`). Builder: `CharacterSnapshot` (Protocol layer).
+
+**Candidate wire layout (datagram, absolute offsets):**
+
+| off | field | endian | note |
+| --- | --- | --- | --- |
+| `0x00` | opcode | BE | candidate `0x03F3` — guess; only affects engine routing |
+| `0x02` | body length | BE | `= len - 4`, mirrors movement framing |
+| `0x04`–`0x13` | reserved | — | zero; engine header layout unconfirmed |
+| `0x14` | `u16 count` | **LE** | walker reads count here |
+| `0x16` | pad | — | zero |
+| `0x18`+ | `32-byte entries` | **LE** | walker reads raw struct (no deserialize) |
+
+Entry fields (LE): `0x00` = `(type<<24)|id`, `0x04` = `X|(Z<<16)`, `0x08` = `Y`,
+`0x0C` = flags(0), `0x1C` = appearance. **Endianness = little-endian** because the
+walker reads the buffer as a native x86 struct (it never calls the deserializer
+`FUN_10041890`) — the one hard inference; everything else (header, routing opcode,
+whether it's UDP at all) is a hypothesis this experiment tests.
+
+**To run:** rebuild Release, start with `FOM_SNAPSHOT_TEST=1`, launch the client,
+enter world, **move**, and arm the gdb hook (`tools/re/attach_spawn.sh`). Decision
+matrix:
+- **Walker fires + 2nd avatar renders** → transport + layout correct; remote spawn
+  solved.
+- **Walker fires but no spawn** → dump its buffer; a field/endianness is off
+  (retry big-endian, or fix the `count`/entry offset the hook reveals).
+- **Walker never fires** → wrong transport/routing for m19; the datagram isn't
+  reaching it. Next: capture what the engine *does* feed m19, or try the reliable
+  channel / a different candidate opcode.

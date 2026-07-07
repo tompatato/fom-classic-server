@@ -23,4 +23,10 @@ public sealed class Player(uint id, ClientSession session)
 
     /// <summary>Most recent position/heading from the UDP movement channel, if any.</summary>
     public MovementUpdate? LastMovement { get; set; }
+
+    /// <summary>
+    /// Experiment latch: set once the snapshot-test injection has sent this player a
+    /// world-state snapshot, so it fires only once (see <see cref="GameHost"/>).
+    /// </summary>
+    public bool SnapshotSent { get; set; }
 }

@@ -9,7 +9,7 @@ public class SpawnInjectionTests
     private static CancellationToken Timeout => new CancellationTokenSource(TimeSpan.FromSeconds(15)).Token;
 
     [Fact]
-    public async Task SpawnTest_InjectsZoneUpdateAfterWorldEntry()
+    public async Task SpawnTest_InjectsMeetingPointAfterWorldEntry()
     {
         CancellationToken ct = Timeout;
         // spawnTest on, tiny delay so the test is fast.
@@ -21,9 +21,10 @@ public class SpawnInjectionTests
         await client.ExpectAsync(PacketId.LOGIN_RETURN, ct);
         await client.SendLoadCharAsync(ct); // triggers ENTER_WORLD, then the injected spawn
 
-        // Skip ENTER_WORLD; the injected 0x082D spawn should arrive.
-        byte[] spawn = await client.ExpectAsync(PacketId.ZONE_UPDATE, ct);
-        Assert.Equal(SpawnZoneUpdate.BodyLength, spawn.Length);
+        // Skip ENTER_WORLD; the injected 0x3FE CMeetingPoint spawn should arrive
+        // (id u32 + x/y/z u16 + 32-byte name = 42-byte body).
+        byte[] spawn = await client.ExpectAsync(PacketId.SPAWN_MEETINGPOINT, ct);
+        Assert.Equal(42, spawn.Length);
     }
 
     [Fact]
