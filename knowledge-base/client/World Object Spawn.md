@@ -335,13 +335,51 @@ handlers** (TCP), after which the engine's m19 pass spawns the entries — *not*
 UDP. (Movement `0x3F3` being UDP is a red herring: it's the client's outbound app
 data, not the engine's inbound replication.)
 
-### ➡️ Next (static Ghidra, not live)
+### 🔎 STATIC DEEP DIVE (2026-07-07): the walker's buffer is engine-supplied
 
-Find which OnMessage handler **writes** the snapshot buffer that `FUN_10036fc0`
-reads. The walker reads `snapshot+0x14` (count) / `+0x18` (entries) off the session
-object `DAT_100b42f0` (or a global). Search for the FUN_ that *stores* into that same
-buffer among the still-unmapped `0x3EA`–`0x3FF` handlers (`0x3EA` `FUN_10034ca0`,
-`0x3EE`, `0x3EF`, `0x3F1` `FUN_10036bf0`, `0x3F6`–`0x3F9`, `0x3FC` `FUN_100355e0`,
-`0x3FF` `FUN_100351d0`) — `0x3F5` is already "appearance update for an existing
-entity", so the character-*add* opcode is likely a sibling. Then deliver that opcode
-over TCP the same way `SpawnMeetingPoint` works.
+Chased "who calls the walker and with what buffer" through Ghidra. Findings:
+
+- **`CCharacter` is created ONLY by the walker.** `FUN_10035930` (the sole
+  `CreateObject "CCharacter"`) has exactly **one** caller — `FUN_10036fc0` at
+  `10037174`. All other `"CCharacter"` string xrefs (`FUN_10037c70`, `FUN_10023680`,
+  `FUN_100171a0`, `FUN_10023870`) are just **class-handle lookups** (`[0x5c]`
+  find-class / `[0x170]` get-class), not create sites. So there is **no per-type
+  TCP opcode** for characters — unlike world objects (`0x3FE` has its own handler
+  that `CreateObject`s directly). A locally-created object *is* replicated to the
+  renderer (that's why the `0x3FE` flag appears), so the absence of any other
+  creator is conclusive: everything routes through the walker.
+- **The walker's only caller is the vtable[19] thunk** (`xref FUN_10036fc0` → one
+  ref, `1002ffda`). So `param_1` (the snapshot buffer) is supplied by whoever
+  invokes m19 — the engine.
+- **Not server.dll.** `server.dll` has **zero** `[reg+0x4c]` vtable calls, and the
+  m18 forwarder `FUN_1002b31a` is only a data ref from the ServerInterface vtable
+  slot `0x10057cf8`. So m19 is invoked by **Lithtech.exe directly**, not via the
+  ServerInterface.
+- **Static offset search can't pin the engine caller.** `0x4c` (= method 19) is a
+  ubiquitous vtable slot — 150+ `[reg+0x4c]` sites in Object.lto, dozens in the
+  engine. The one clean engine candidate that passes a stack *buffer* to `+0x4c`
+  (`FUN_0045eb40` via `DAT_0058ab94`, from the client frame update `FUN_0040fac0`)
+  is **object position interpolation** (its `+0x4c` returns a float vector;
+  `DAT_0058ab94`/`DAT_0058ab8c` are physics/model interfaces, not the shell — its
+  `+0x44` call is used as a live method, but shell m17 is a stub, so it's not the
+  shell). `find_indexed_calls` on the engine surfaces only switch jumptables and a
+  generic hashtable template (`FUN_00424780`), not the shell dispatch.
+
+**Conclusion:** the character snapshot is delivered by the **LithTech engine's own
+object-replication / threaded dispatch path**, not by the FoM app-opcode layer we
+drive for everything else (login, world, chat, movement, world-objects). Pinning the
+exact engine trigger is blocked statically by vtable-offset collision.
+
+### ➡️ Next: decouple the two unknowns dynamically
+
+The remaining unknowns are **(a) the entry/buffer format** and **(b) the transport
+that makes the engine call m19**. Solve (a) independently of (b) with gdb: attach,
+then **manually invoke the walker** on a hand-built buffer —
+`call ((int(*)(void*,void*))0x<walker>)(DAT_100b42f0, &buf)` with `buf` = our 32-byte
+entry layout (`count@+0x14`, entry@+0x18). If an avatar renders, the entry format is
+**confirmed** and only transport (b) remains; if not, fix the fields the walker reads
+and retry. This turns the hard transport question into a checkable one. For (b) the
+likely path is reversing the engine UDP recv `Lithtech.exe!FUN_0047dab0` → its async
+queue consumer → the m19 dispatch, or capturing real 2006-server traffic if any
+exists. (The earlier "find the OnMessage handler that writes the buffer" idea is
+**ruled out** — no Object.lto handler writes it; the engine does.)
