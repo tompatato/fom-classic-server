@@ -428,3 +428,34 @@ Format and transport can't be decoupled cheaply, so go after **transport directl
 2. **Or capture real 2006-server traffic** (any pcap/retail server) to read the
    actual character-spawn bytes on the wire — the cleanest ground truth if a source
    exists.
+
+### 🔬 TRANSPORT RE (2026-07-07): the engine inbound path is bit-packed netmgr
+
+Decompiled the engine UDP receive `Lithtech.exe!FUN_0047dab0`:
+
+- `Ordinal_17` (`recvfrom`) into an 8168-byte stack buffer; on success it wraps the
+  datagram as a **ref-counted bit-stream message** — `FUN_00456410(&msg, buf,
+  bytes * 8)` (note `* 8`: the length is tracked in **bits**, i.e. LithTech
+  `ILTMessage`, which is **bit-packed**, not byte-aligned) — then pushes it through a
+  smart-pointer slot `FUN_0042b720` (release-old / assign / incref) → `FUN_00409810`
+  (enqueue/notify). Consumed asynchronously by a reader thread.
+- `FUN_0047dab0` is called from the engine socket loops `FUN_00481020`,
+  `FUN_004832d0`, `FUN_00483940` — stock LithTech netmgr.
+
+**So the engine's inbound world-state channel is LithTech's bit-packed netmgr
+message layer** — a different, lower level than FoM's plain `[op][len][body]` app
+protocol that our server speaks (and that the client uses for movement, which we
+parse as plain bytes). To drive m19 through here we'd have to reproduce LithTech's
+netmgr framing + the bit-packed object-update message — a big lift.
+
+**⚠️ Pivotal open question before investing there: does FoM even USE netmgr, or
+bypass it?** Everything our plain server drives (login, world, chat, movement,
+`0x3FE`) is plain and byte-aligned, which suggests FoM may bypass netmgr for app
+traffic — in which case `FUN_0047dab0` is a red herring and m19's buffer comes from
+FoM's own code. **Answer this cheaply and SAFELY first** with a *logging-only* gdb
+breakpoint (the spawn-hook style never destabilized the client — only the
+inferior-call invoke did) on `FUN_0047dab0` (engine base + RVA `0x7dab0`) plus the
+walker `FUN_10036fc0`, while the plain server runs: if the engine recv fires on our
+traffic, netmgr is in play and worth reversing; if it never fires, FoM bypasses it
+and the m19 trigger is elsewhere (re-open the FoM-side search, incl. CShell.dll and
+the client's own UDP handler).
