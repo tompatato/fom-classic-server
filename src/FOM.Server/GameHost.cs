@@ -35,6 +35,14 @@ public sealed class GameHost
     /// <summary>How long after world entry to inject the experimental spawn.</summary>
     public TimeSpan SpawnDelay { get; }
 
+    /// <summary>
+    /// Experiment: once a player starts sending movement, push them a single
+    /// character world-state snapshot (a second avatar offset from the player) over
+    /// UDP, to see whether the Object.lto spawn walker fires. See
+    /// <see cref="CharacterSnapshot"/> and <c>knowledge-base/client/World Object Spawn.md</c>.
+    /// </summary>
+    public bool SnapshotTest { get; }
+
     /// <summary>Registers a newly-logged-in player and links it to the session.</summary>
     public Player RegisterPlayer(ClientSession session, string name)
     {
@@ -49,7 +57,7 @@ public sealed class GameHost
     }
 
     public GameHost(string bindAddress, int firstPort, int lastPort, string? capturePath = null,
-                    bool spawnTest = false, double spawnDelaySeconds = 6)
+                    bool spawnTest = false, double spawnDelaySeconds = 6, bool snapshotTest = false)
     {
         _address = IPAddress.Parse(bindAddress);
         _firstPort = firstPort;
@@ -57,8 +65,15 @@ public sealed class GameHost
         _capture = new CaptureLog(capturePath);
         SpawnTest = spawnTest;
         SpawnDelay = TimeSpan.FromSeconds(spawnDelaySeconds);
+        SnapshotTest = snapshotTest;
         _dispatcher = new GameDispatcher(this);
     }
+
+    /// <summary>Id offset for the experiment's second (snapshot) character, so it can't collide with the player.</summary>
+    private const uint SnapshotCharacterIdOffset = 4243;
+
+    /// <summary>Known-good test appearance code captured live (male, race nibble 1).</summary>
+    private const uint TestAppearanceCode = 0x71088820;
 
     /// <summary>Serves every port until <paramref name="ct"/> is cancelled.</summary>
     public async Task RunAsync(CancellationToken ct)
@@ -260,12 +275,50 @@ public sealed class GameHost
                         // best-effort echo
                     }
                 }
+
+                // Snapshot experiment: once we know the player's UDP endpoint and a
+                // valid position, push them a single world-state snapshot describing a
+                // second character standing beside them, and see whether the Object.lto
+                // spawn walker fires (i.e. a remote avatar appears). One-shot per player.
+                if (SnapshotTest)
+                {
+                    await MaybeSendSnapshotAsync(udp, result.RemoteEndPoint, update, ct);
+                }
             }
             _capture.Udp(port, opcode, datagram, handled: move is not null);
             string suffix = move is { } m
                 ? $"  MOVE sess={m.Session} X={m.X} Y={m.Y} Z={m.Z} heading={m.Heading} (~{m.HeadingDegrees:F0}deg)"
                 : string.Empty;
             PacketLog.Line($"UDP {WorldPort.FromPort(port)}:{port} <- {result.RemoteEndPoint} len={result.ReceivedBytes}{suffix}");
+        }
+    }
+
+    // Snapshot experiment (see SnapshotTest): push one character world-state snapshot
+    // to a player, exactly once. Looks the player up by movement session id and places
+    // the test character beside them using their just-received position, so if the
+    // spawn walker fires a second avatar appears next to the player rather than inside.
+    private async Task MaybeSendSnapshotAsync(Socket udp, EndPoint client, MovementUpdate at, CancellationToken ct)
+    {
+        if (!_world.TryGet(at.Session, out Player? player) || player is null || player.SnapshotSent)
+        {
+            return;
+        }
+        player.SnapshotSent = true;
+
+        uint entityId = player.Id + SnapshotCharacterIdOffset;
+        ushort x = (ushort)(at.X + 0x100); // offset in X so it stands beside the player
+        var entry = new SnapshotEntry(entityId, x, at.Y, at.Z, TestAppearanceCode);
+        byte[] datagram = CharacterSnapshot.Build(entry);
+
+        PacketLog.Line($"  [snapshot-test] pushing character snapshot id={entityId} " +
+            $"at x={x} y={at.Y} z={at.Z} appearance=0x{TestAppearanceCode:X8} ({datagram.Length} bytes)");
+        try
+        {
+            await udp.SendToAsync(datagram, SocketFlags.None, client, ct);
+        }
+        catch (SocketException e)
+        {
+            PacketLog.Line($"  [snapshot-test] send failed: {e.Message}");
         }
     }
 }
