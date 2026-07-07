@@ -393,3 +393,38 @@ likely path is reversing the engine UDP recv `Lithtech.exe!FUN_0047dab0` → its
 queue consumer → the m19 dispatch, or capturing real 2006-server traffic if any
 exists. (The earlier "find the OnMessage handler that writes the buffer" idea is
 **ruled out** — no Object.lto handler writes it; the engine does.)
+
+### ❌ NEGATIVE RESULT (2026-07-07): gdb-invoking the walker crashes the client
+
+Ran `invoke_walker.sh` against the live client (in-world). Notes for anyone
+repeating this:
+
+- **The setup works; the call does not.** After stripping the confirmation
+  breakpoint (a breakpoint hit *inside* a gdb inferior call hangs batch gdb, which
+  froze the client ~2 min and killed it) and the extra object-lookup call (hung /
+  faulted under the SIGSEGV-pass needed for Wine), the minimal call succeeded from
+  gdb's view: `malloc` in-inferior returned a buffer, `ECX = session` (thiscall
+  `this`), `FUN_10036fc0(buf)` **returned 0 and gdb detached cleanly**.
+- **But the client froze on resume and had to be force-killed** (coredump =
+  `pthread_exit`/`abort_thread` forced unwind — the signature of a manual kill of a
+  wedged process). So calling the walker **outside the engine's server-update tick**
+  returns but leaves the game inconsistent: `FUN_10035930`'s `CreateObject` →
+  appearance/model resolution → object registration isn't safe to run out-of-context.
+- Cost each attempt: the client must be relaunched + re-enter world. Three crashes.
+
+**Conclusion: the entry format cannot be validated by out-of-context invocation in
+this environment.** `tools/re/invoke_walker.{py,sh}` are kept as a documented
+dead-end with a warning header — do not run against a client you care about.
+
+### ➡️ Real next step: reverse the transport (or capture real traffic)
+
+Format and transport can't be decoupled cheaply, so go after **transport directly**:
+1. **Reverse the engine's inbound world-state path.** `Lithtech.exe!FUN_0047dab0`
+   (UDP `recvfrom`) → the datagram queue `FUN_0042b720` → the async consumer that
+   eventually calls shell m19. Decompile the queue consumer / netmsg dispatcher to
+   learn the LithTech engine packet format that carries object state, then emit that
+   from `GameHost` — this is engine (netmgr) framing, a level below the FoM app
+   opcodes we already speak.
+2. **Or capture real 2006-server traffic** (any pcap/retail server) to read the
+   actual character-spawn bytes on the wire — the cleanest ground truth if a source
+   exists.

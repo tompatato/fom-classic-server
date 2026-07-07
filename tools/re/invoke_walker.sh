@@ -3,6 +3,10 @@
 # snapshot walker with a hand-built buffer (tools/re/invoke_walker.py), to confirm
 # the entry/buffer format independent of transport. See World Object Spawn.md.
 #
+# ⚠️ NEGATIVE RESULT (2026-07-07): DOES NOT WORK — crashes the client. The walker
+# can't be safely invoked outside the engine's server-update tick. Documented
+# dead-end; do not run against a client you care about.
+#
 # Prereqs: ptrace_scope=0, same user as the client, client LOGGED IN + IN-WORLD
 # (so Object.lto is mapped). One-shot: attaches, invokes, detaches (game resumes,
 # so a spawned avatar persists). Re-run to iterate with different coords.
