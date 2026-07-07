@@ -540,3 +540,34 @@ effort/payoff order:
    `0x3FD` CAdvertisement etc. likely follow the same recipe) but **not player
    avatars**, and pivot to building out world-object / gameplay features that don't
    depend on the walker.
+
+### 🔗 CROSS-REFERENCE: post-Milestone server (CommunityofMankind) (2026-07-07)
+
+Consulted a **post-Milestone** (pre-FotD) FoM server that *does* render remote
+players — a C# emulator at `/mnt/dev/CommunityofMankind` (build ~1599, **RakNet**
+transport via SharpRakNet; has an IDA db of that era's `fom_client.exe`). Used as a
+**hypothesis source only** — different engine + RakNet, so wire format / packet IDs
+**do not port** to our 2006 plain protocol; nothing copied.
+
+Value harvested — it confirms the **semantic model** of a FoM character spawn (from
+`RaknetSession.cs`, the avatar/appearance section): a **per-entity message** carrying
+`id · type · worldId · X/Y/Z · rotation · appearance · rank · animation · scale ·
+mood · name`, with appearance **bit-packed** as `gender(1) skin(1) headMesh(5)
+hairStyle(5) factionId(4) torsoClothing(12) legClothing(12) shoes(12) gloves(12)
+[+armor slots if shown]`. This matches our 2006 walker entry carrying appearance
+inline (`@+0x1c`); the 2006 packed-u32 appearance is the **simpler ancestor** of this
+expanded post-Milestone layout (which grew separate 12-bit clothing/armor fields).
+
+What it does **not** give: the 2006 m19 trigger (post-Milestone is a different engine
+and uses RakNet BitStream). It did, however, motivate a **complete sweep of the 2006
+OnMessage router** — both `0x3EA–0x3FF` *and* the previously-unexamined `0x7D7–0x831`
+handlers (`FUN_10034080/10036510/100341c0/1003aa10/100380e0/10033ce0/10033db0/
+10032b20/100326f0`). **None** references the walker, the CCharacter creator, the
+appearance fns, or builds a `count@+0x14`/`entries@+0x18` buffer. So the "we missed
+the character opcode" hypothesis is now **fully closed**: no 2006 app message feeds
+the walker.
+
+**Remaining CoM angle (if pursued):** dynamically hook *their* client
+(`fom_client.exe`) as a real player spawns to see how *that* engine invokes its
+spawn from a received message; if the engine lineage is shared, the invocation
+pattern could hint at the 2006 m19 caller. Bigger effort; different binary.
