@@ -2,6 +2,13 @@
 # snapshot walker with a hand-built buffer, to decouple the two open unknowns:
 #   (a) the entry/buffer FORMAT   vs   (b) the TRANSPORT that makes the engine call it.
 #
+# ⚠️ NEGATIVE RESULT (2026-07-07): THIS DOES NOT WORK — it CRASHES the client.
+# Calling the walker out of the engine's normal server-update tick returns 0 in gdb
+# but leaves the game wedged; the client freezes and dies (SIGSEGV on forced kill).
+# Root cause: FUN_10035930's CreateObject -> appearance/model resolution -> object
+# registration is not safe to run outside the engine tick. Kept as a documented
+# dead-end. Do NOT run against a client you care about. See World Object Spawn.md.
+#
 # Background (knowledge-base/client/World Object Spawn.md): a remote avatar is only
 # ever created by the walker FUN_10036fc0 -> FUN_10035930 (the sole CCharacter
 # creator). The walker is engine-invoked (vtable[19]); our app-UDP snapshot never
@@ -60,19 +67,6 @@ def _set32(addr, val):
     gdb.execute("set *(unsigned int *)0x%x = %u" % (addr, val & 0xffffffff), to_string=True)
 
 
-class _SpawnBP(gdb.Breakpoint):
-    """Logs when the walker reaches the CCharacter creator during our manual call."""
-    hit = False
-
-    def stop(self):
-        _SpawnBP.hit = True
-        sp = int(gdb.parse_and_eval("$sp"))
-        entry = _u32(sp + 4)
-        print("  >>> FUN_10035930 reached: entry@0x%x id=%d appearance=0x%x"
-              % (entry, _u32(entry) & 0xffffff, _u32(entry + 0x1c)))
-        return False  # auto-continue
-
-
 class FomInvoke(gdb.Command):
     def __init__(self):
         super().__init__("fom-invoke", gdb.COMMAND_USER)
@@ -86,6 +80,9 @@ class FomInvoke(gdb.Command):
                 gdb.execute("handle %s nostop noprint pass" % sig, to_string=True)
             except gdb.error:
                 pass
+        # If the inferior call faults, unwind back to the pre-call state instead of
+        # leaving the client's thread stranded in the dummy frame (which corrupts it).
+        gdb.execute("set unwindonsignal on", to_string=True)
         args = arg.split()
         x = int(args[0]) if len(args) > 0 else 0
         y = int(args[1]) if len(args) > 1 else 0
@@ -122,20 +119,15 @@ class FomInvoke(gdb.Command):
         _set32(e + 0x0c, 0)                         # flags (node 0, spawn, no skip)
         _set32(e + 0x1c, appear)                    # appearance
 
-        _SpawnBP("*0x%x" % (base + RVA_SPAWN))
-        _SpawnBP.hit = False
-        print("invoking walker(session, buf=0x%x)  id=%d pos=(%d,%d,%d) appear=0x%x"
-              % (buf, TEST_ID, x, y, z, appear))
+        print("invoking walker(session=0x%x, buf=0x%x)  id=%d pos=(%d,%d,%d) appear=0x%x"
+              % (session, buf, TEST_ID, x, y, z, appear))
         # thiscall: `this` in ECX, snapshot on the stack.
         gdb.execute("set $ecx = 0x%x" % session, to_string=True)
         try:
             ret = gdb.parse_and_eval("((int(*)(int))0x%x)(0x%x)" % (walker, buf))
-            print("walker returned %s" % ret)
+            print("walker returned %s -- check the client for a new avatar at your position." % ret)
         except gdb.error as ex:
             print("call failed: %s" % ex)
-            return
-        print("=> CCharacter creator %s during the call. Check the client for a new avatar."
-              % ("WAS reached" if _SpawnBP.hit else "was NOT reached"))
 
 
 FomInvoke()
