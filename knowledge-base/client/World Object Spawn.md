@@ -459,3 +459,39 @@ walker `FUN_10036fc0`, while the plain server runs: if the engine recv fires on 
 traffic, netmgr is in play and worth reversing; if it never fires, FoM bypasses it
 and the m19 trigger is elsewhere (re-open the FoM-side search, incl. CShell.dll and
 the client's own UDP handler).
+
+### ✅ ANSWERED (2026-07-07): FoM BYPASSES netmgr — `FUN_0047dab0` is a red herring
+
+Ran the logging hook (`spawn_hook.py`, now with the engine-recv breakpoint at
+`Lithtech.exe base 0x400000 + 0x7dab0 = 0x47dab0`, inserted clean) against the live
+client while the server streamed **100 UDP snapshots** to it (`FOM_SNAPSHOT_TEST=1
+FOM_SNAPSHOT_REPEAT=1`). Session hit counts:
+
+| breakpoint | fired |
+| --- | --- |
+| `FUN_10008080` SetAppearance | 2  ← positive control (hook is live this session) |
+| `FUN_1003df00` ENTER_WORLD | 3  ← positive control |
+| **`FUN_0047dab0` engine UDP recv** | **0** |
+| `FUN_10036fc0` walker | 0 |
+
+The hook provably fires (SetAppearance/ENTER_WORLD) yet the engine netmgr UDP recv
+caught **none** of our 100 datagrams — which *are* delivered to the client socket
+(connected UDP, source = world port). **⇒ FoM services its UDP with its own code;
+LithTech netmgr is not in the inbound path.** So reversing `FUN_0047dab0` → m19 is
+**ruled out** — abandon the netmgr-framing plan.
+
+### ➡️ Next: find FoM's own inbound handler that seeds the m19 snapshot
+
+With netmgr out, m19 is almost certainly driven by the engine's **per-tick server
+update** building the snapshot from the local Object.lto server's object/entity
+state — and that state is seeded by **FoM's own code** on inbound app traffic. Hunt:
+1. **FoM's own UDP recv** (not the engine's): find the code that reads the client's
+   movement socket (`recvfrom`/`Ordinal_17` xrefs in **CShell.dll** / **Object.lto**,
+   not Lithtech.exe). A message type there may add a remote entity.
+2. **The remaining OnMessage (m18, TCP) handlers** — only 3 of ~10 were decompiled
+   (`0x3EA`,`0x3F1`,`0x3FC`); check the rest (`0x3EE`,`0x3EF`,`0x3F6`–`0x3F9`,`0x3FF`)
+   for a write into the object manager `DAT_100b42e0` / a pending-spawn list the
+   per-tick m19 pass then consumes. `0x3F5` is "appearance update for an existing
+   entity", so the character-*add* sibling is the target.
+3. Reconsider what actually invokes m19 per tick (the engine server-update path), now
+   that the netmgr hypothesis is dead.
